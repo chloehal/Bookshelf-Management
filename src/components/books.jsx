@@ -22,14 +22,16 @@ export function BookCover({ book, large = false }) {
       }}
       aria-hidden="true"
     >
-      <span className="cover-author">{book.author}</span>
-      <span className="cover-rule" />
-      <strong>{book.title}</strong>
-      <span className="cover-mark">
-        <BookOpen size={18} />
-      </span>
-      <span className="cover-genre">
-        {book.genres?.[0] || "Bibliothèque personnelle"}
+      <span className="cover-face">
+        <span className="cover-author">{book.author}</span>
+        <span className="cover-rule" />
+        <strong className={book.title.length > 32 ? "cover-title-long" : ""}>
+          {book.title}
+        </strong>
+        <span className="cover-ornament" />
+        <span className="cover-genre">
+          {book.genres?.[0] || "Bibliothèque personnelle"}
+        </span>
       </span>
     </div>
   );
