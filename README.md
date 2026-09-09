@@ -19,8 +19,8 @@ Application web de gestion de bibliothèque personnelle avec challenge de lectur
 - **Frontend** : React, shadcn/ui, Tailwind CSS v4, JavaScript
 - **Backend** : PHP, MySQL (PDO)
 - **Build** : Vite
-- **Typographie** : Georgia et police système sans serif
-- **Thème** : papier ivoire, encre, orange brûlé
+- **Typographie** : police système sans serif
+- **Thème** : shadcn neutral, composants standards, accent orange discret
 
 ## Installation locale
 

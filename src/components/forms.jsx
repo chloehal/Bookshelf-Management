@@ -22,7 +22,7 @@ import { BookRow } from "./books";
 export function Choice({ label, value, onChange, options }) {
   return (
     <Select value={value} onValueChange={onChange}>
-      <SelectTrigger aria-label={label}>
+      <SelectTrigger className="w-full" aria-label={label}>
         <SelectValue placeholder={label} />
       </SelectTrigger>
       <SelectContent>

@@ -74,7 +74,7 @@ test("navigation mobile, filtre sans accents et retour navigateur", async ({
 }) => {
   await setup(page);
   await expect(
-    page.getByRole("heading", { name: "Un chapitre à la fois." }),
+    page.getByRole("heading", { name: "Vue d’ensemble" }),
   ).toBeVisible();
   await page
     .getByRole("navigation", { name: "Navigation principale" })

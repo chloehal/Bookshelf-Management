@@ -6,6 +6,7 @@ import {
   Search,
   Star,
 } from "lucide-react";
+import { Card, CardContent } from "./ui/card";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
 import { Progress } from "./ui/progress";
@@ -61,40 +62,42 @@ export function Rating({ value = 0, onChange, disabled = false }) {
 }
 export function BookCard({ book, onOpen, current, loan }) {
   return (
-    <button
-      className="book-card"
-      onClick={() => onOpen(book.id)}
-      aria-label={`Ouvrir ${book.title}`}
-    >
-      <BookCover book={book} />
-      <div className="book-card-copy">
-        <div className="book-card-meta">
-          <span>{book.genres?.[0] || "Livre"}</span>
-          {current ? (
-            <Bookmark size={13} />
-          ) : book.is_read ? (
-            <span className="read-dot" title="Lu" />
-          ) : null}
+    <Card className="gap-0 overflow-hidden py-0">
+      <button
+        className="book-card"
+        onClick={() => onOpen(book.id)}
+        aria-label={`Ouvrir ${book.title}`}
+      >
+        <BookCover book={book} />
+        <div className="book-card-copy">
+          <div className="book-card-meta">
+            <span>{book.genres?.[0] || "Livre"}</span>
+            {current ? (
+              <Bookmark size={13} />
+            ) : book.is_read ? (
+              <span className="read-dot" title="Lu" />
+            ) : null}
+          </div>
+          <h3>{book.title}</h3>
+          <p>{book.author}</p>
+          {loan ? (
+            <span className="small-label">Prêté à {loan.person}</span>
+          ) : book.rating ? (
+            <Rating value={book.rating} />
+          ) : (
+            <span className="small-label">
+              {current
+                ? "En cours"
+                : book.is_read
+                  ? "Lu"
+                  : book.is_wishlist
+                    ? "À offrir à ma bibliothèque"
+                    : "À lire"}
+            </span>
+          )}
         </div>
-        <h3>{book.title}</h3>
-        <p>{book.author}</p>
-        {loan ? (
-          <span className="small-label">Prêté à {loan.person}</span>
-        ) : book.rating ? (
-          <Rating value={book.rating} />
-        ) : (
-          <span className="small-label">
-            {current
-              ? "En cours"
-              : book.is_read
-                ? "Lu"
-                : book.is_wishlist
-                  ? "À offrir à ma bibliothèque"
-                  : "À lire"}
-          </span>
-        )}
-      </div>
-    </button>
+      </button>
+    </Card>
   );
 }
 export function BookRow({ book, onOpen, children }) {
@@ -125,44 +128,46 @@ export function ReadingCard({
 }) {
   const pct = percent(entry.current_page, entry.page_count);
   return (
-    <article className={`reading-card ${featured ? "featured-reading" : ""}`}>
-      <button
-        className="reading-cover-button"
-        onClick={() => onOpen(book.id)}
-        aria-label={`Ouvrir ${book.title}`}
-      >
-        <BookCover book={book} large />
-      </button>
-      <div className="reading-copy">
-        <span className="eyebrow">
-          <span className="live-dot" /> EN COURS DE LECTURE
-        </span>
-        <h2>{book.title}</h2>
-        <p className="reading-author">{book.author}</p>
-        <div className="reading-genres">
-          {book.genres?.map((g) => (
-            <Badge key={g} variant="secondary">
-              {g}
-            </Badge>
-          ))}
-        </div>
-        <div className="reading-progress">
-          <div>
-            <span>
-              {entry.current_page} / {entry.page_count || "—"} pages
-            </span>
-            <strong>{entry.page_count ? `${pct} %` : "En cours"}</strong>
-          </div>
-          <Progress value={pct} aria-label={`Progression de ${book.title}`} />
-        </div>
-        <Button
-          onClick={() => onProgress(book.id)}
-          aria-label="Mettre à jour ma lecture"
+    <Card className={featured ? "featured-reading" : ""}>
+      <CardContent className="reading-layout px-4 sm:px-6">
+        <button
+          className="reading-cover-button"
+          onClick={() => onOpen(book.id)}
+          aria-label={`Ouvrir ${book.title}`}
         >
-          Mettre à jour <ArrowUpRight size={16} />
-        </Button>
-      </div>
-    </article>
+          <BookCover book={book} large />
+        </button>
+        <div className="reading-copy">
+          <span className="eyebrow">
+            <span className="live-dot" /> EN COURS DE LECTURE
+          </span>
+          <h2>{book.title}</h2>
+          <p className="reading-author">{book.author}</p>
+          <div className="reading-genres">
+            {book.genres?.map((g) => (
+              <Badge key={g} variant="secondary">
+                {g}
+              </Badge>
+            ))}
+          </div>
+          <div className="reading-progress">
+            <div>
+              <span>
+                {entry.current_page} / {entry.page_count || "—"} pages
+              </span>
+              <strong>{entry.page_count ? `${pct} %` : "En cours"}</strong>
+            </div>
+            <Progress value={pct} aria-label={`Progression de ${book.title}`} />
+          </div>
+          <Button
+            onClick={() => onProgress(book.id)}
+            aria-label="Mettre à jour ma lecture"
+          >
+            Mettre à jour <ArrowUpRight size={16} />
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 export function Empty({

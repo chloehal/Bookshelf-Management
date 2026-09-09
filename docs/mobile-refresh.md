@@ -41,3 +41,12 @@ Build Vite. Vérification que api/ et schema.sql n’ont aucun diff.
 - Revue indépendante : problèmes de compatibilité repérés puis corrigés.
 - `git diff HEAD -- api schema.sql` : aucun changement.
 - Aucun déploiement effectué ; aperçu local de démonstration seulement.
+
+## Correction visuelle demandée après aperçu
+La direction éditoriale initiale est remplacée par l’apparence native de shadcn.
+- Thème neutral officiel : fond blanc, gris neutres, boutons primaires noirs.
+- Police sans serif sur tous les écrans ; suppression de la typographie et des décorations éditoriales.
+- Suppression des surcharges globales visant les data-slot des composants shadcn.
+- Cartes de l’accueil et du catalogue composées avec Card, CardHeader, CardContent et CardFooter.
+- CSS applicatif limité aux layouts, à la navigation mobile et aux visualisations des livres.
+- Géométrie mobile des dialogues conservée ; couleurs, focus, contrôles et titres utilisent leurs styles shadcn.

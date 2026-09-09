@@ -170,7 +170,7 @@ export default function App() {
             <BookOpen size={23} />
           </span>
           <span>
-            ma bibliothèque<span>LE GOÛT DES PAGES</span>
+            Ma bibliothèque<span>Espace personnel</span>
           </span>
         </a>
         <p className="sidebar-caption">MON ESPACE</p>
@@ -188,19 +188,8 @@ export default function App() {
           ))}
         </nav>
         <div className="sidebar-bottom">
-          <div className="shelf-doodle" aria-hidden="true">
-            <i />
-            <i />
-            <i />
-            <i />
-            <i />
-          </div>
-          <p>
-            Une place pour
-            <br />
-            <em>chaque histoire.</em>
-          </p>
-          <span>Ta bibliothèque personnelle</span>
+          <BookOpen size={18} />
+          <span>Bibliothèque personnelle</span>
         </div>
       </aside>
       <div className="app-body">
@@ -324,8 +313,8 @@ export default function App() {
           )}
         </main>
         <footer className="app-footer">
-          <span>MA BIBLIOTHÈQUE</span>
-          <span>Le plaisir de lire, le soin de garder.</span>
+          <span>Ma bibliothèque</span>
+          <span>Espace personnel</span>
         </footer>
       </div>
       {notice && (
