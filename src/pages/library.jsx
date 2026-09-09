@@ -129,6 +129,7 @@ export function LibraryPage({
             onClick={() => set("view", "grid")}
           >
             <LayoutGrid size={17} />
+            <span>Cartes</span>
           </button>
           <button
             aria-label="Vue étagère"
@@ -136,6 +137,7 @@ export function LibraryPage({
             onClick={() => set("view", "shelf")}
           >
             <LibraryBig size={18} />
+            <span>Étagère</span>
           </button>
         </div>
       </div>

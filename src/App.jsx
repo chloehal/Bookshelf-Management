@@ -51,7 +51,7 @@ export default function App() {
     [notice, setNotice] = useState(""),
     [busy, setBusy] = useState(false),
     [modal, setModal] = useState(null),
-    [filters, setFilters] = useState(defaultFilters),
+    [filters, setFilters] = useState({ ...defaultFilters, view: "shelf" }),
     [wishFilters, setWishFilters] = useState(defaultFilters),
     [loading, setLoading] = useState(true);
   const needsRefresh = useRef(false),
