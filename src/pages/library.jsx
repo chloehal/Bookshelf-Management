@@ -1,3 +1,4 @@
+import { Bookshelf } from "../components/bookshelf";
 import { useState } from "react";
 import {
   Search,
@@ -25,12 +26,7 @@ import {
   PageHeading,
 } from "../components/books";
 import { Choice } from "../components/forms";
-import {
-  filterBooks,
-  coverColor,
-  coverForeground,
-  dateLabel,
-} from "../lib/library";
+import { filterBooks, dateLabel } from "../lib/library";
 import { api } from "../lib/api";
 export function LibraryPage({
   data,
@@ -215,29 +211,7 @@ export function LibraryPage({
             : "Ajoute ton premier livre à la collection."}
         </Empty>
       ) : filters.view === "shelf" ? (
-        <div className="shelves">
-          {Array.from({ length: Math.ceil(books.length / 9) }, (_, i) => (
-            <div className="shelf" key={i}>
-              {books.slice(i * 9, i * 9 + 9).map((b) => (
-                <button
-                  className="book-spine"
-                  style={{
-                    "--cover": coverColor(b),
-                    "--cover-ink": coverForeground(b),
-                    height: `${150 + (b.size || (b.id % 3) + 1) * 16}px`,
-                  }}
-                  onClick={() => openBook(b.id)}
-                  key={b.id}
-                  aria-label={`Ouvrir ${b.title}`}
-                >
-                  <span>{b.author}</span>
-                  <strong>{b.title}</strong>
-                  <BookOpen size={14} />
-                </button>
-              ))}
-            </div>
-          ))}
-        </div>
+        <Bookshelf books={books} openBook={openBook} />
       ) : (
         <div className="book-grid">
           {books.map((b) => (

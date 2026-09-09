@@ -2056,3 +2056,96 @@
     scroll-behavior: auto !important;
   }
 }
+
+/* Shelf semantics: unread books stand by genre; read books form flat piles. */
+@layer components {
+  .shelf {
+    overflow: visible;
+    gap: 4px;
+    padding: 0;
+    margin-bottom: 52px;
+  }
+  .shelf:last-child {
+    margin-bottom: 28px;
+  }
+  .shelf-legend {
+    font-size: 11px;
+    color: var(--muted-foreground);
+    margin-bottom: 24px;
+  }
+  .shelf-standing {
+    position: relative;
+    flex: 0 0 auto;
+  }
+  .shelf-row + .shelf-row {
+    margin-top: 28px;
+  }
+  .shelf-row .shelf {
+    margin-bottom: 0;
+  }
+  .shelf-themes {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 16px;
+    padding-top: 8px;
+    font-size: 11px;
+    color: var(--muted-foreground);
+  }
+  .book-spine {
+    flex: none;
+    min-width: 0;
+    max-width: none;
+    gap: 6px;
+    box-shadow:
+      inset 2px 0 3px #0002,
+      inset -1px 0 2px #fff2;
+  }
+  .book-spine strong {
+    font-size: 10px;
+    max-height: 130px;
+  }
+  .book-spine > span {
+    font-size: 8px;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    max-height: 120px;
+  }
+  .book-pile {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    flex: 0 0 auto;
+  }
+  .pile-book {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--cover);
+    color: var(--cover-ink);
+    border-radius: 2px;
+    padding: 3px 8px;
+    text-align: left;
+    box-shadow:
+      inset 0 2px 3px #ffffff15,
+      inset 0 -2px 3px #0002;
+  }
+  .pile-book strong {
+    font-size: 10px;
+    font-weight: 500;
+    flex: 1;
+  }
+  .pile-book span {
+    font-size: 8px;
+    max-width: 35%;
+    opacity: 0.8;
+  }
+  .pile-book strong,
+  .pile-book span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .pile-book:hover {
+    filter: brightness(1.1);
+  }
+}
