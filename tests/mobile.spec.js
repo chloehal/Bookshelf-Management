@@ -337,3 +337,39 @@ test("les états vides et les écrans étroits ne débordent pas", async ({
   await page.goto("/#/library");
   await expect(page.getByText("La première page est à écrire.")).toBeVisible();
 });
+
+for (const viewport of [
+  { width: 320, height: 568 },
+  { width: 390, height: 664 },
+  { width: 640, height: 360 },
+  { width: 768, height: 600 },
+]) {
+  test(`formulaire dans l’écran ${viewport.width}x${viewport.height}`, async ({
+    page,
+  }) => {
+    await page.setViewportSize(viewport);
+    await setup(page);
+    await page
+      .getByRole("button", { name: "Ajouter un livre", exact: true })
+      .first()
+      .click();
+    await page.getByText("Pages, année et apparence", { exact: true }).click();
+    const dialog = page.getByRole("dialog");
+    await expect(async () => {
+      const box = await dialog.boundingBox();
+      expect(box.x).toBeGreaterThanOrEqual(0);
+      expect(box.y).toBeGreaterThanOrEqual(0);
+      expect(box.x + box.width).toBeLessThanOrEqual(viewport.width + 1);
+      expect(box.y + box.height).toBeLessThanOrEqual(viewport.height + 1);
+    }).toPass();
+    await page.getByLabel("Titre", { exact: true }).fill("Livre responsive");
+    await dialog
+      .getByRole("button", { name: "Enregistrer", exact: true })
+      .scrollIntoViewIfNeeded();
+    await expect(
+      dialog.getByRole("button", { name: "Enregistrer", exact: true }),
+    ).toBeInViewport();
+    await dialog.getByRole("button", { name: "Annuler", exact: true }).click();
+    await expect(dialog).toHaveCount(0);
+  });
+}
