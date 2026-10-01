@@ -2042,7 +2042,9 @@
     right: 0;
     width: 100% !important;
     max-width: 100% !important;
-    translate: none !important;
+    /* Reset Tailwind translation variables; zero translate is optimized away. */
+    --tw-translate-x: 0px !important;
+    --tw-translate-y: 0px !important;
     transform: none !important;
     border-radius: var(--radius);
     padding-bottom: calc(24px + env(safe-area-inset-bottom));
