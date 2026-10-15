@@ -104,3 +104,11 @@ function catalog_lookup($bibkey) {
     if (empty($match[1])) throw new RuntimeException('Cette édition ne possède pas de référence utilisable');
     return catalog_normalize($book, $match[1]);
 }
+
+// Preserve the reading fraction across editions; no old total means keep the page.
+function catalog_convert_progress($page, $oldTotal, $newTotal) {
+    $page = max(0, (int) $page);
+    if (!$newTotal || (int) $newTotal === (int) $oldTotal) return $page;
+    if ((int) $oldTotal > 0) return (int) round(min(1, $page / (int) $oldTotal) * (int) $newTotal);
+    return min($page, (int) $newTotal);
+}

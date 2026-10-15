@@ -24,6 +24,8 @@ class TestCatalogDatabase extends PDO {
 }
 $db = new TestCatalogDatabase('sqlite::memory:', null, null, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC]);
 $db->exec('CREATE TABLE books (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, author TEXT, genres TEXT, isbn TEXT UNIQUE, page_count INTEGER, publisher TEXT, published_date TEXT, cover_url TEXT, metadata_source TEXT, metadata_source_id TEXT, metadata_snapshot TEXT, metadata_linked_at TEXT, year INTEGER, rating INTEGER, is_read INTEGER, is_gift INTEGER, is_wishlist INTEGER, color TEXT, size INTEGER, UNIQUE(metadata_source, metadata_source_id))');
+$db->exec('CREATE TABLE currently_reading (id INTEGER PRIMARY KEY, book_id INTEGER UNIQUE, current_page INTEGER, started_at TEXT)');
+$db->exec('CREATE TABLE reading_log (id INTEGER PRIMARY KEY, book_id INTEGER, pages_read INTEGER, log_date TEXT)');
 $db->exec("INSERT INTO books (title, author, genres, page_count, year, rating, is_read, is_gift, color, size) VALUES ('Dune local', 'Frank Herbert', '[\"SF\"]', 200, 2024, 5, 1, 1, '#ffaa00', 2)");
 $before = $db->query('SELECT * FROM books WHERE id = 1')->fetch();
 $payload = ['id' => 1, 'candidate' => $candidate, 'expected' => catalog_values($before), 'choices' => ['title' => 'local', 'page_count' => 'api', 'isbn' => 'api', 'genres' => 'local', 'rating' => 'api', 'year' => 'api']];
@@ -43,3 +45,32 @@ check($added['title'] === 'Titre relu' && json_decode($added['genres'], true) ==
 check(json_decode($added['metadata_snapshot'], true)['title'] === 'Dune', 'Edited preview keeps original API source');
 check($added['cover_url'] === $new['cover_url'], 'Edition artwork persisted');
 echo "PHP persistence tests passed\n";
+
+$db->exec("INSERT INTO currently_reading VALUES (1, 2, 100, '2026-10-01')");
+$db->exec("INSERT INTO reading_log VALUES (1, 2, 100, '2026-10-02')");
+$activeCandidate = $new; $activeCandidate['page_count'] = 824;
+$activeLocal = $db->query('SELECT * FROM books WHERE id = 2')->fetch();
+$activePayload = ['id' => 2, 'candidate' => $activeCandidate, 'expected' => catalog_values($activeLocal), 'choices' => ['page_count' => 'api']];
+catalog_import($db, $activePayload);
+check((int) $db->query('SELECT current_page FROM currently_reading WHERE book_id = 2')->fetchColumn() === 200, 'Automatic percentage: 100/412 becomes 200/824');
+check((int) $db->query('SELECT SUM(pages_read) FROM reading_log')->fetchColumn() === 100, 'Conversion creates no reading activity');
+$activeLocal = $db->query('SELECT * FROM books WHERE id = 2')->fetch();
+$activePayload['expected'] = catalog_values($activeLocal); $activePayload['candidate']['page_count'] = 150;
+catalog_import($db, $activePayload);
+check((int) $db->query('SELECT current_page FROM currently_reading WHERE book_id = 2')->fetchColumn() === 36, 'Smaller edition rescales automatically');
+check((int) $db->query('SELECT SUM(pages_read) FROM reading_log')->fetchColumn() === 100, 'History remains unchanged after repeated conversion');
+check(catalog_convert_progress(120, 300, 400) === 160, 'Preserve fraction');
+check(catalog_convert_progress(110, 200, 400) === 220, 'Stale edition progress form converts to latest pagination');
+check(catalog_convert_progress(120, null, 400) === 120, 'Unknown old total preserves page');
+check(catalog_convert_progress(120, null, 80) === 80, 'Unknown total clamps to new edition');
+check(catalog_convert_progress(500, 300, 400) === 400, 'Overflow clamps to complete edition');
+// Legacy displayed position can differ from its cached current_page.
+$db->exec("UPDATE books SET metadata_source = NULL, page_count = 150 WHERE id = 2");
+$db->exec('UPDATE currently_reading SET current_page = 2 WHERE book_id = 2');
+$activePayload['expected'] = catalog_values($db->query('SELECT * FROM books WHERE id = 2')->fetch());
+$activePayload['candidate']['page_count'] = 300;
+catalog_import($db, $activePayload);
+check((int) $db->query('SELECT current_page FROM currently_reading WHERE book_id = 2')->fetchColumn() === 200, 'Legacy migration uses displayed 100/150, not cached page 2');
+$readFlag = $db->query('SELECT is_read FROM books WHERE id = 2')->fetchColumn();
+check(!$readFlag, 'Conversion never marks a book finished');
+echo "PHP automatic reading reconciliation tests passed\n";

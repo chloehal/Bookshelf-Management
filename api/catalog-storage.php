@@ -36,6 +36,25 @@ function catalog_import(PDO $pdo, array $data) {
                 throw new CatalogImportException('Cette édition existe déjà : ' . $other['title'], 409);
             }
         }
+        if ($id) {
+            $stmt = $pdo->prepare('SELECT id, current_page FROM currently_reading WHERE book_id = ? FOR UPDATE');
+            $stmt->execute([$id]);
+            $reading = $stmt->fetch();
+            if ($reading) {
+                $page = (int) $reading['current_page'];
+                // Legacy fiches displayed the sum of the reading log. Adopt that
+                // displayed position once when linking; linked fiches store position separately.
+                if (empty($local['metadata_source'])) {
+                    $stmt = $pdo->prepare('SELECT COALESCE(SUM(pages_read), 0) FROM reading_log WHERE book_id = ?');
+                    $stmt->execute([$id]);
+                    $page = (int) $stmt->fetchColumn();
+                }
+                $page = catalog_convert_progress($page, $local['page_count'], $values['page_count']);
+                $stmt = $pdo->prepare('UPDATE currently_reading SET current_page = ? WHERE book_id = ?');
+                $stmt->execute([$page, $id]);
+                // Edition conversion is not reading activity: leave reading_log untouched.
+            }
+        }
         $columns = CATALOG_FIELDS;
         $params = array_map(fn($key) => $key === 'genres' ? json_encode($values[$key], JSON_UNESCAPED_UNICODE) : $values[$key], $columns);
         array_push($params, 'openlibrary', $candidate['source_id'], json_encode($candidate, JSON_UNESCAPED_UNICODE));

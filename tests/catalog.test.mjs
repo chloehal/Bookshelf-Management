@@ -31,3 +31,11 @@ test('cover presentation keeps the edition artwork and provides a safe readable 
   assert.match(coverHtml({title:'<Dune>',author:'Frank Herbert'}), /&lt;Dune&gt;/);
   assert.doesNotMatch(coverHtml({title:'<Dune>',author:'Frank Herbert'}), /<img/);
 });
+
+test('automatic reading conversion preserves fraction or page when old total is unknown', async () => {
+  const { convertProgress } = await import('../catalog.mjs');
+  assert.equal(convertProgress(120, 300, 400), 160);
+  assert.equal(convertProgress(120, null, 400), 120);
+  assert.equal(convertProgress(120, null, 80), 80);
+  assert.equal(convertProgress(500, 300, 400), 400);
+});

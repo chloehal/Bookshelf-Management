@@ -1,5 +1,5 @@
 import { coverHtml } from './book-cover.mjs';
-import { CATALOG_FIELDS, normalizeIsbn, comparisonRows, reconciliationPayload, hasValue } from './catalog.mjs';
+import { CATALOG_FIELDS, normalizeIsbn, comparisonRows, reconciliationPayload, hasValue, convertProgress } from './catalog.mjs';
 
 const escape = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 const display = value => Array.isArray(value) ? value.join(', ') : String(value ?? '—');
@@ -56,6 +56,19 @@ export function setupImportManagement({ getBooks, reloadBooks, api, showPage, re
     $('reconciliation-save').disabled = !!existing;
     $('reconciliation-save').textContent = selected ? 'Enregistrer mes choix et lier la fiche' : 'Ajouter à la bibliothèque';
     $('reconciliation-fields').innerHTML = selected ? `<div class="overflow-x-auto"><table class="table"><caption class="text-left pb-3">Tes valeurs sont conservées par défaut. Les champs vides peuvent être complétés par l’API.</caption><thead><tr><th>Champ</th><th>Ma fiche</th><th>Open Library</th><th>Valeur à conserver</th></tr></thead><tbody>${comparisonRows(selected, item).map(row => `<tr><th scope="row">${row.label}${row.different && row.available ? '<span class="badge badge-warning badge-xs ml-2">Différent</span>' : ''}</th><td class="catalog-value">${row.key === 'cover_url' ? coverHtml(selected, true) : escape(display(row.current))}</td><td class="catalog-value">${row.available ? (row.key === 'cover_url' ? coverHtml(item, true) : escape(display(row.proposed))) : '<span class="opacity-50">Non renseigné</span>'}</td><td>${row.available && row.different ? `<fieldset class="flex flex-col gap-2"><legend class="sr-only">${row.label} : valeur à conserver</legend><label class="flex items-center gap-2"><input type="radio" class="radio radio-sm" name="reconcile-${row.key}" value="local" ${hasValue(row.current) ? 'checked' : ''}>Ma fiche</label><label class="flex items-center gap-2"><input type="radio" class="radio radio-sm" name="reconcile-${row.key}" value="api" ${!hasValue(row.current) ? 'checked' : ''}>API</label></fieldset>` : '<span class="text-sm opacity-60">' + (row.available ? 'Identique' : 'Ma fiche conservée') + '</span>'}</td></tr>`).join('')}</tbody></table></div>` : `<div class="catalog-preview">${coverHtml(item)}<div><h3 class="font-medium">${escape(item.title)}</h3><p>${escape(item.author)}</p><p class="text-sm opacity-70">${escape([item.publisher, item.published_date, item.isbn].filter(Boolean).join(' · '))}</p></div></div><p class="text-sm mb-4">Vérifie les informations et complète-les si nécessaire. Genres : trois maximum, séparés par des virgules.</p><div class="grid gap-4 sm:grid-cols-2">${Object.keys(CATALOG_FIELDS).map(key => fieldInput(key, item[key], 'new-api')).join('')}</div>`;
+    if (selected?.reading_id && item.page_count && item.page_count !== selected.page_count) {
+      $('reconciliation-fields').insertAdjacentHTML('beforeend', '<p id="reading-conversion-preview" class="alert mt-4" role="status"></p>');
+      const updateProgressPreview = () => {
+        const useApi = document.querySelector('input[name="reconcile-page_count"]:checked')?.value === 'api';
+        const page = Number(selected.current_page) || 0;
+        const converted = convertProgress(page, selected.page_count, item.page_count);
+        $('reading-conversion-preview').textContent = useApi
+          ? `Progression adaptée automatiquement : page ${page}${selected.page_count ? ' / ' + selected.page_count : ''} → page ${converted} / ${item.page_count}. ${selected.page_count ? 'Le pourcentage lu est conservé.' : 'L’ancien total est inconnu : la page actuelle est conservée dans la limite du nouveau total.'} L’historique de lecture reste inchangé.`
+          : 'Pagination locale conservée : la progression ne change pas.';
+      };
+      document.querySelectorAll('input[name="reconcile-page_count"]').forEach(input => input.addEventListener('change', updateProgressPreview));
+      updateProgressPreview();
+    }
     if (!existing) $('reconciliation-heading').focus();
   }
   function renderResults(results, resultItems, newBook) {

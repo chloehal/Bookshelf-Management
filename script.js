@@ -917,7 +917,7 @@ async function saveProgress() {
     page = Math.round(rawValue);
   }
 
-  await api('reading.php', 'POST', { action: 'update_page', book_id: bookId, current_page: page, log_date: logDate });
+  await api('reading.php', 'POST', { action: 'update_page', book_id: bookId, current_page: page, page_count_at_input: totalPages, log_date: logDate });
   closeProgressModal();
   await loadCurrentlyReading();
   displayCurrentlyReading();
@@ -2634,8 +2634,8 @@ window.dnfReading = dnfReading;
 // --- Initialisation ---
 document.addEventListener("DOMContentLoaded", async () => {
   importManagement = setupImportManagement({
-    getBooks: () => books, reloadBooks: loadBooks, api, showPage,
-    refreshLibrary: () => { displayBooks(); displayShelf(); displayWishlist(); },
+    getBooks: () => books, reloadBooks: async () => { await Promise.all([loadBooks(), loadCurrentlyReading()]); }, api, showPage,
+    refreshLibrary: () => { displayBooks(); displayShelf(); displayWishlist(); displayCurrentlyReading(); },
   });
   await Promise.all([loadBooks(), loadChallengeData(), loadCurrentlyReading()]);
   displayCurrentlyReading();

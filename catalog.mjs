@@ -32,3 +32,9 @@ export function reconciliationPayload(local, candidate, choices) {
     choices: Object.fromEntries(rows.map(r => [r.key, r.available && choices[r.key] === 'api' ? 'api' : 'local'])),
   };
 }
+
+export function convertProgress(page, oldTotal, newTotal) {
+  page = Math.max(0, Number(page) || 0);
+  if (!newTotal || Number(newTotal) === Number(oldTotal)) return page;
+  return oldTotal > 0 ? Math.round(Math.min(1, page / oldTotal) * newTotal) : Math.min(page, newTotal);
+}

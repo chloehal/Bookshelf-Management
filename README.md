@@ -151,3 +151,17 @@ local au port 5176. Lancer `npm run dev -- --host 127.0.0.1 --port 5176`, puis
 
 Contrôle optionnel de l’API publique en lecture seule : `php tests/catalog-live.php`.
 Il vérifie les recherches ISBN, titre/auteur et la liste paginée des autres éditions.
+
+### Progression lors d’un changement de pagination
+
+La réconciliation adapte automatiquement la position des lectures en cours au
+pourcentage déjà lu : 120/300 devient 160/400. Si le total précédent est inconnu,
+la page est conservée et plafonnée au nouveau total. La conversion utilise la
+progression la plus récente au moment de l’enregistrement et se fait dans la même
+transaction que la fiche. Un aperçu est affiché sans choix supplémentaire.
+
+Les pages réellement lues et les dates du journal restent inchangées : un changement
+d’édition ne crée aucune activité dans la heatmap. Les livres terminés restent lus.
+Pour les anciennes fiches, l’application récupère automatiquement la progression
+précédemment affichée avant de la convertir ; aucune correction rétroactive ni
+migration SQL supplémentaire n’est nécessaire.

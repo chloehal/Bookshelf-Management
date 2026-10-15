@@ -1,7 +1,7 @@
 // Run with PLAYWRIGHT_MODULE=/absolute/path/to/@playwright/test node tests/browser.cjs
 const { chromium, expect } = require(process.env.PLAYWRIGHT_MODULE || '@playwright/test');
 const candidate = { source: 'openlibrary', source_id: 'OL123M', title: 'Dune API', author: 'Frank Herbert', genres: ['Science-fiction'], page_count: 412, isbn: '9780441172719', publisher: 'Ace', published_date: '1965', cover_url: 'https://covers.openlibrary.org/b/id/123-M.jpg?default=false' };
-const base = [{ id: 7, title: 'Dune local', author: 'Frank Herbert', genres: ['SF'], page_count: 200, is_read: true, rating: 5, year: 2024, is_gift: false, is_wishlist: false, isbn: null, publisher: null, published_date: null }];
+const base = [{ id: 7, title: 'Dune local', author: 'Frank Herbert', genres: ['SF'], page_count: 200, reading_id: 1, current_page: 100, is_read: false, rating: 5, year: 2024, is_gift: false, is_wishlist: false, isbn: null, publisher: null, published_date: null }];
 (async () => {
  const browser = await chromium.launch({ headless: true });
  for (const width of [1280, 390]) {
@@ -48,6 +48,8 @@ const base = [{ id: 7, title: 'Dune local', author: 'Frank Herbert', genres: ['S
   await expect(page.locator('#reconciliation-fields')).toContainText('Dune API');
   await expect(page.locator('input[name="reconcile-title"][value="local"]')).toBeChecked();
   await page.locator('input[name="reconcile-page_count"][value="api"]').check();
+  await expect(page.locator('#reading-conversion-preview')).toContainText('page 100 / 200 → page 206 / 412');
+  await expect(page.locator('#reading-conversion-preview')).toContainText('automatiquement');
   failSave = true;
   await page.locator('#reconciliation-save').click();
   await expect(page.locator('#reconciliation-status')).toContainText('Enregistrement impossible');
