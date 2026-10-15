@@ -204,3 +204,21 @@ d’édition ne crée aucune activité dans la heatmap. Les livres terminés res
 Pour les anciennes fiches, l’application récupère automatiquement la progression
 précédemment affichée avant de la convertir ; aucune correction rétroactive ni
 migration SQL supplémentaire n’est nécessaire.
+
+## Déploiement Git direct dans Hostinger
+
+La commande reste `npm run build`, avec `dist` comme répertoire de sortie.
+Le build prépare désormais **le frontend et l’API PHP** (`dist/api`), ainsi que
+`.htaccess`. Le serveur de publication doit exécuter PHP ; un hébergement
+strictement statique ne suffit pas pour cette application.
+
+Définir dans l’environnement du build Hostinger `DB_NAME`, `DB_USER` et
+`DB_PASSWORD`, ainsi que `DB_HOST` si différent de `localhost`. Utiliser les
+identifiants MySQL Hostinger, pas les identifiants de connexion au panneau.
+Le build génère `dist/api/config.php` depuis ces variables ; il ne copie jamais
+le fichier privé local `api/config.php`. Ces identifiants ne sont pas inclus dans
+le JavaScript du navigateur et ne sont pas affichés dans les journaux de build.
+Sans ces variables, l’API renvoie un message JSON de configuration manquante.
+
+Le déploiement Git direct Hostinger ne nécessite pas les secrets FTP GitHub :
+ceux-ci concernent seulement le workflow GitHub Actions optionnel.
