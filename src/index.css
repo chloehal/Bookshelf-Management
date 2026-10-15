@@ -2152,3 +2152,19 @@
     filter: brightness(1.1);
   }
 }
+
+/* Edition artwork stays complete; a failed image reveals the existing typographic cover. */
+.book-cover .edition-cover { display: block; position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; background: var(--card); z-index: 2; }
+.import-form { padding: clamp(1rem, 3vw, 2rem); display: grid; gap: 1.25rem; }
+.import-search { display: flex; flex-wrap: wrap; align-items: end; gap: 1rem; }
+.import-search .field { flex: 1; min-width: 170px; }
+.import-result, .import-preview { display: flex; gap: 1.5rem; align-items: center; padding: 1.25rem; border-bottom: 1px solid var(--border); }
+.import-result > .book-cover { width: 80px; height: 120px; flex-shrink: 0; }
+.import-result > div:last-child { min-width: 0; overflow-wrap: anywhere; }
+.import-result h3, .reconciliation-field legend { font-weight: 600; }
+.reconciliation-field { border-top: 1px solid var(--border); padding-top: 1rem; min-width: 0; }
+.reconciliation-values { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+.reconciliation-value { display: flex; flex-direction: column; gap: .75rem; padding: 1rem; border: 1px solid var(--border); overflow-wrap: anywhere; min-width: 0; }
+.reconciliation-value .book-cover { width: 90px; height: 135px; }
+.import-feedback { padding: 1rem; border: 1px solid var(--border); background: var(--muted); }
+@media(max-width: 600px) { .reconciliation-values { grid-template-columns: 1fr; } .import-result { gap: .75rem; padding: 1rem; } .import-preview { padding: 0; gap: 1rem; } }

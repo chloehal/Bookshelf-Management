@@ -4,7 +4,24 @@ CREATE TABLE IF NOT EXISTS books (
   author VARCHAR(255) NOT NULL,
   genres JSON NOT NULL,
   is_read TINYINT(1) DEFAULT 0,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  year INT DEFAULT NULL,
+  is_gift TINYINT(1) NOT NULL DEFAULT 0,
+  is_wishlist TINYINT(1) NOT NULL DEFAULT 0,
+  rating TINYINT UNSIGNED DEFAULT NULL,
+  page_count INT UNSIGNED DEFAULT NULL,
+  color VARCHAR(7) DEFAULT NULL,
+  size TINYINT UNSIGNED DEFAULT NULL,
+  isbn VARCHAR(13) DEFAULT NULL,
+  publisher VARCHAR(255) DEFAULT NULL,
+  published_date VARCHAR(100) DEFAULT NULL,
+  cover_url VARCHAR(255) DEFAULT NULL,
+  metadata_source VARCHAR(30) DEFAULT NULL,
+  metadata_source_id VARCHAR(50) DEFAULT NULL,
+  metadata_snapshot JSON DEFAULT NULL,
+  metadata_linked_at TIMESTAMP NULL DEFAULT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY books_isbn_unique (isbn),
+  UNIQUE KEY books_metadata_source_unique (metadata_source, metadata_source_id)
 );
 
 CREATE TABLE IF NOT EXISTS challenge (

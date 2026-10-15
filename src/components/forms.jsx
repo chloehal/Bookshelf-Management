@@ -93,7 +93,8 @@ export function FormModal({ modal, onClose, data, mutate }) {
           throw new Error(
             "La progression ne peut pas diminuer avec le suivi actuel.",
           );
-        operation = () => api.progress(book.id, page, date);
+        operation = () =>
+          api.progress(book.id, page, date, book.page_count || 0);
       }
       if (modal.type === "loan") {
         if (!selected || !person.trim())

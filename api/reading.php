@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/catalog-lib.php';
 
 $method = $_SERVER['REQUEST_METHOD'];
 
@@ -11,7 +12,7 @@ switch ($method) {
             // Get all currently reading books with book info
             $stmt = $pdo->query('
                 SELECT cr.id, cr.book_id,
-                       COALESCE((SELECT SUM(rl.pages_read) FROM reading_log rl WHERE rl.book_id = cr.book_id), 0) AS current_page,
+                       CASE WHEN b.metadata_source IS NULL THEN COALESCE((SELECT SUM(rl.pages_read) FROM reading_log rl WHERE rl.book_id = cr.book_id), 0) ELSE cr.current_page END AS current_page,
                        cr.started_at,
                        b.title, b.author, b.page_count, b.color, b.genres
                 FROM currently_reading cr
@@ -65,6 +66,17 @@ switch ($method) {
     case 'POST':
         $data = json_decode(file_get_contents('php://input'), true);
         $action = $data['action'] ?? '';
+        $bookId = (int) ($data['book_id'] ?? 0);
+        if (!$bookId || !in_array($action, ['start', 'update_page', 'finish', 'dnf'], true)) {
+            http_response_code(400); echo json_encode(['error' => 'Livre ou action invalide']); exit;
+        }
+        // Serialize progress writes with edition reconciliation on the same book.
+        $pdo->beginTransaction();
+        $lock = $pdo->prepare('SELECT id, page_count FROM books WHERE id = ? FOR UPDATE');
+        $lock->execute([$bookId]);
+        $lockedBook = $lock->fetch();
+        if (!$lockedBook) { $pdo->rollBack(); http_response_code(404); echo json_encode(['error' => 'Livre introuvable']); exit; }
+
 
         if ($action === 'start') {
             // Start reading a book
@@ -82,6 +94,10 @@ switch ($method) {
             // Update current page
             $bookId = (int) ($data['book_id'] ?? 0);
             $page = (int) ($data['current_page'] ?? 0);
+            if (array_key_exists('page_count_at_input', $data)) {
+                // An already-open form may still use the pagination of the old edition.
+                $page = catalog_convert_progress($page, $data['page_count_at_input'], $lockedBook['page_count']);
+            }
             if (!$bookId) {
                 http_response_code(400);
                 echo json_encode(['error' => 'book_id requis']);
@@ -89,7 +105,7 @@ switch ($method) {
             }
 
             // Get previous page to calculate pages read
-            $stmt = $pdo->prepare('SELECT current_page FROM currently_reading WHERE book_id = ?');
+            $stmt = $pdo->prepare('SELECT CASE WHEN b.metadata_source IS NULL THEN COALESCE((SELECT SUM(rl.pages_read) FROM reading_log rl WHERE rl.book_id = cr.book_id), 0) ELSE cr.current_page END AS current_page FROM currently_reading cr JOIN books b ON b.id = cr.book_id WHERE cr.book_id = ?');
             $stmt->execute([$bookId]);
             $prev = $stmt->fetch();
             $prevPage = $prev ? (int) $prev['current_page'] : 0;
@@ -118,7 +134,7 @@ switch ($method) {
             }
 
             // Get current page info for final log
-            $stmt = $pdo->prepare('SELECT current_page FROM currently_reading WHERE book_id = ?');
+            $stmt = $pdo->prepare('SELECT CASE WHEN b.metadata_source IS NULL THEN COALESCE((SELECT SUM(rl.pages_read) FROM reading_log rl WHERE rl.book_id = cr.book_id), 0) ELSE cr.current_page END AS current_page FROM currently_reading cr JOIN books b ON b.id = cr.book_id WHERE cr.book_id = ?');
             $stmt->execute([$bookId]);
             $prev = $stmt->fetch();
             $prevPage = $prev ? (int) $prev['current_page'] : 0;
@@ -158,6 +174,7 @@ switch ($method) {
             $stmt->execute([$bookId]);
             echo json_encode(['success' => true]);
         }
+        $pdo->commit();
         break;
 
     default:

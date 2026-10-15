@@ -20,8 +20,14 @@ export function createApi(fetcher = (...args) => fetch(...args)) {
         "Réponse du serveur illisible. Réessaie dans un instant.",
       );
     }
-    if (!response.ok || result?.error || result?.success === false)
-      throw new Error(result?.error || "L’action n’a pas pu être enregistrée.");
+    if (!response.ok || result?.error || result?.success === false) {
+      const error = new Error(
+        result?.error || "L’action n’a pas pu être enregistrée.",
+      );
+      error.status = response.status;
+      error.code = result?.code;
+      throw error;
+    }
     return result;
   }
   return {
@@ -49,12 +55,13 @@ export function createApi(fetcher = (...args) => fetch(...args)) {
     buy: (id) => request("wishlist.php", "POST", { id }),
     reading: (action, book_id) =>
       request("reading.php", "POST", { action, book_id }),
-    progress: (book_id, current_page, log_date) =>
+    progress: (book_id, current_page, log_date, page_count_at_input) =>
       request("reading.php", "POST", {
         action: "update_page",
         book_id,
         current_page,
         log_date,
+        ...(page_count_at_input === undefined ? {} : { page_count_at_input }),
       }),
     loan: (book_id, person, loan_date) =>
       request("loans.php", "POST", { book_id, person, loan_date }),

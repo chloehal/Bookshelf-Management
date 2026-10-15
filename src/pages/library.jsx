@@ -35,6 +35,7 @@ export function LibraryPage({
   filters,
   setFilters,
   wishlist = false,
+  navigate,
 }) {
   const [expanded, setExpanded] = useState(false);
   const source = data.books.filter((b) => Boolean(b.is_wishlist) === wishlist),
@@ -64,6 +65,16 @@ export function LibraryPage({
           </span>
         </Button>
       </PageHeading>
+      {!wishlist && (
+        <div className="flex flex-wrap gap-3 mb-6">
+          <Button variant="outline" onClick={() => navigate("import/isbn")}>
+            Ajouter par ISBN
+          </Button>
+          <Button variant="ghost" onClick={() => navigate("import")}>
+            Import Management
+          </Button>
+        </div>
+      )}
       <div className="catalogue-tools">
         <div className="search-field">
           <Search size={18} />
@@ -283,6 +294,24 @@ export function BookPage({ id, data, openModal, run, busy, navigate }) {
             }
           />
           <dl className="book-facts">
+            {book.isbn && (
+              <div>
+                <dt>ISBN</dt>
+                <dd>{book.isbn}</dd>
+              </div>
+            )}
+            {book.publisher && (
+              <div>
+                <dt>Éditeur</dt>
+                <dd>{book.publisher}</dd>
+              </div>
+            )}
+            {book.published_date && (
+              <div>
+                <dt>Publication</dt>
+                <dd>{book.published_date}</dd>
+              </div>
+            )}
             <div>
               <dt>Pages</dt>
               <dd>{book.page_count || "Non renseigné"}</dd>

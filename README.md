@@ -138,3 +138,69 @@ Les tests navigateur interceptent les appels API avec une bibliothèque de test.
 Les fichiers de `public/` (manifeste, icônes et service worker) sont copiés automatiquement dans `dist/`.
 Le worker retire le cache obsolète de l’ancienne interface ; la consultation et la modification nécessitent une connexion.
 Le déploiement Hostinger reste celui décrit plus haut. Un push sur `main` déclenche toujours la publication.
+
+## Import de livres et migration d’une installation existante
+
+L’ajout manuel reste disponible dans « Tous mes livres », sous l’ajout par ISBN.
+Les recherches passent par `api/catalog.php` vers [Open Library](https://openlibrary.org/dev/docs/api/books).
+PHP doit disposer de cURL et mbstring ; aucune clé API n’est nécessaire.
+
+Avant de mettre le nouveau frontend en service, sauvegarder la base, déposer les
+fichiers PHP mis à jour puis exécuter `/api/migrate.php`. Pour appliquer uniquement
+les changements Open Library dans phpMyAdmin, exécuter une seule fois
+`migrations/2026-10-15-openlibrary.sql` dans l’onglet SQL avant de fusionner la PR. Vérifier que chaque
+migration est `OK` ou `SKIP`. Cela ajoute les colonnes ISBN, couverture, éditeur,
+date de publication et provenance, ainsi que les contraintes d’unicité des éditions.
+Les anciennes fiches restent manuelles jusqu’à leur rapprochement. Pour une
+nouvelle base, `schema.sql` contient déjà ces colonnes.
+
+« Import Management » permet de sélectionner une fiche, rechercher une édition,
+puis ouvrir « Réconciliation ». Les valeurs locales existantes sont sélectionnées
+par défaut ; une valeur API absente n’efface jamais la fiche. La validation met à
+jour uniquement les champs bibliographiques. L’année d’acquisition, les notes,
+la lecture, les cadeaux, la wishlist, les couleurs/tailles et les emprunts restent
+inchangés. Une fiche liée peut être comparée à nouveau depuis le filtre « Fiches
+liées à l’API ». La source et son dernier instantané sont conservés en base.
+
+L’association est explicite : une recherche titre/auteur peut proposer une autre
+édition ou une autre langue. Vérifier l’éditeur, la date et la couverture ; l’ISBN
+est préférable pour identifier l’exemplaire. Les sujets Open Library peuvent
+être en anglais. Ils peuvent être corrigés dans la prévisualisation d’un nouvel
+ajout ou conservés tels quels depuis la fiche locale lors de la réconciliation.
+Aucune synchronisation automatique n’écrase les choix enregistrés.
+
+## Vérification
+
+```bash
+npm test
+npm run build
+```
+
+Les tests PHP exécutent les requêtes d’import sur une base SQLite en mémoire,
+sans accéder à la base configurée dans `api/config.php`. Ils vérifient la
+conservation des données personnelles, les conflits, les doublons et la provenance.
+La suppression de `FOR UPDATE` dans l’adaptateur SQLite de test signifie que les
+verrous/concurrences MySQL doivent encore être vérifiés sur un environnement de test MySQL.
+
+Les parcours navigateur sont dans `tests/import.spec.js` (Playwright). Ils utilisent
+une bibliothèque simulée, jamais les données de production. `npm run test:browser`
+lance les parcours d’import sur ordinateur et mobile avec le serveur Vite local
+fourni par Playwright. `npm run test:e2e` lance aussi les parcours de l’interface mobile.
+Installer Chromium avec `npx playwright install chromium` si nécessaire.
+
+Contrôle optionnel de l’API publique en lecture seule : `php tests/catalog-live.php`.
+Il vérifie les recherches ISBN, titre/auteur et la liste paginée des autres éditions.
+
+### Progression lors d’un changement de pagination
+
+La réconciliation adapte automatiquement la position des lectures en cours au
+pourcentage déjà lu : 120/300 devient 160/400. Si le total précédent est inconnu,
+la page est conservée et plafonnée au nouveau total. La conversion utilise la
+progression la plus récente au moment de l’enregistrement et se fait dans la même
+transaction que la fiche. Un aperçu est affiché sans choix supplémentaire.
+
+Les pages réellement lues et les dates du journal restent inchangées : un changement
+d’édition ne crée aucune activité dans la heatmap. Les livres terminés restent lus.
+Pour les anciennes fiches, l’application récupère automatiquement la progression
+précédemment affichée avant de la convertir ; aucune correction rétroactive ni
+migration SQL supplémentaire n’est nécessaire.

@@ -18,6 +18,7 @@ import {
 import { Button } from "./components/ui/button";
 import { FormModal } from "./components/forms";
 import { PageHeading } from "./components/books";
+import { ImportPage } from "./pages/import";
 import { HomePage } from "./pages/home";
 import { LibraryPage, BookPage } from "./pages/library";
 import {
@@ -132,7 +133,14 @@ export default function App() {
     }
   }
   const [page, id] = route.split("/");
-  const active = ["wishlist", "challenge", "quiz", "stats"].includes(page)
+  const active = [
+    "wishlist",
+    "challenge",
+    "quiz",
+    "stats",
+    "import",
+    "reconciliation",
+  ].includes(page)
     ? "more"
     : page === "book"
       ? "library"
@@ -145,12 +153,25 @@ export default function App() {
     run,
     busy,
     mutate,
+    reload: load,
   };
   const extra = [
     ["wishlist", "Mes envies", "Les livres que tu aimerais avoir", Heart],
     ["challenge", "Mon challenge", "Une année, des histoires", Trophy],
     ["stats", "Mes statistiques", "Retrouver ton rythme", ChartNoAxesCombined],
     ["quiz", "Que lire ensuite ?", "Laisser parler tes envies", Shuffle],
+    [
+      "import",
+      "Import Management",
+      "Ajouter par ISBN et enrichir mes fiches",
+      LibraryBig,
+    ],
+    [
+      "reconciliation",
+      "Réconciliation",
+      "Comparer mes données avec Open Library",
+      RefreshCw,
+    ],
   ];
   return (
     <div className="app-shell">
@@ -262,6 +283,9 @@ export default function App() {
               {page === "challenge" && <ChallengePage {...props} />}
               {page === "quiz" && <QuizPage {...props} />}
               {page === "stats" && <StatsPage {...props} />}
+              {(page === "import" || page === "reconciliation") && (
+                <ImportPage {...props} route={page} />
+              )}
               {page === "more" && (
                 <>
                   <PageHeading
@@ -301,6 +325,8 @@ export default function App() {
                 "quiz",
                 "stats",
                 "more",
+                "import",
+                "reconciliation",
               ].includes(page) && (
                 <>
                   <PageHeading title="Cette page s’est égarée." />

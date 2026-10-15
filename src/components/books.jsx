@@ -1,3 +1,5 @@
+import { useState } from "react";
+import { safeCoverUrl } from "../../book-cover.mjs";
 import {
   BookOpen,
   ArrowUpRight,
@@ -13,6 +15,13 @@ import { Progress } from "./ui/progress";
 import { coverColor, coverForeground, percent } from "../lib/library";
 
 export function BookCover({ book, large = false }) {
+  book = {
+    ...book,
+    title: book.title || "Sans titre",
+    author: book.author || "Auteur non renseigné",
+  };
+  const [failedUrl, setFailedUrl] = useState(null);
+  const imageUrl = safeCoverUrl(book.cover_url);
   return (
     <div
       className={`book-cover ${large ? "book-cover-large" : ""}`}
@@ -22,6 +31,17 @@ export function BookCover({ book, large = false }) {
       }}
       aria-hidden="true"
     >
+      {imageUrl && imageUrl !== failedUrl && (
+        <img
+          className="edition-cover"
+          src={imageUrl}
+          alt=""
+          loading="lazy"
+          decoding="async"
+          referrerPolicy="no-referrer"
+          onError={() => setFailedUrl(imageUrl)}
+        />
+      )}
       <span className="cover-face">
         <span className="cover-author">{book.author}</span>
         <span className="cover-rule" />

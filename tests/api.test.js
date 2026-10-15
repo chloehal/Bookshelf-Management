@@ -58,3 +58,16 @@ test("charge les cinq ressources existantes sans mutation", async () => {
     log: [],
   });
 });
+
+test("préserve le statut des conflits pour recharger les fiches avant une nouvelle comparaison", async () => {
+  const api = createApi(async () =>
+    Response.json(
+      { error: "La fiche a changé", code: "conflict" },
+      { status: 409 },
+    ),
+  );
+  await assert.rejects(
+    api.request("book-import.php", "POST", {}),
+    (error) => error.status === 409 && error.code === "conflict",
+  );
+});
