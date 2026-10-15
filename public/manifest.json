@@ -4,8 +4,8 @@
   "description": "Gestion de ma bibliothèque personnelle",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#f5f0e0",
-  "theme_color": "#FF4D00",
+  "background_color": "#ffffff",
+  "theme_color": "#ffffff",
   "icons": [
     {
       "src": "/icons/icon-192.png",
@@ -17,5 +17,6 @@
       "sizes": "512x512",
       "type": "image/png"
     }
-  ]
+  ],
+  "scope": "/"
 }

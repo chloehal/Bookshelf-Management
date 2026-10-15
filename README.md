@@ -5,10 +5,6 @@ Application web de gestion de bibliothèque personnelle avec challenge de lectur
 ## Fonctionnalités
 
 - **Bibliothèque visuelle** : étagère interactive avec tranches colorées et personnalisables
-- **Ajout par ISBN** : recherche ISBN-10/13 dans Open Library, prévisualisation et correction avant ajout, sans clé API
-- **Import Management** : retrouver une édition par ISBN ou titre/auteur pour les fiches déjà encodées, avec filtres manuelles/liées
-- **Réconciliation** : choisir la valeur locale ou API pour chaque champ (titre, auteur, ISBN, genres, pages, éditeur, date de publication, couverture), conserver la source et son instantané original
-- **Couvertures** : image complète de l’édition, sans recadrage, ou vignette titre/auteur en cas d’image absente ou inaccessible
 - **Catalogue de livres** : parcourir, ajouter, modifier et supprimer des livres avec filtres et tri
 - **Marquer comme lu / noter** : suivre ses lectures et attribuer des notes sur 5 étoiles
 - **Wishlist** : gérer une liste de livres souhaités et les marquer comme achetés
@@ -20,11 +16,11 @@ Application web de gestion de bibliothèque personnelle avec challenge de lectur
 
 ## Stack technique
 
-- **Frontend** : HTML, Tailwind CSS v4, DaisyUI v5, JavaScript vanilla
+- **Frontend** : React, shadcn/ui, Tailwind CSS v4, JavaScript
 - **Backend** : PHP, MySQL (PDO)
 - **Build** : Vite
-- **Police** : Lexend
-- **Thème** : daisysword (custom DaisyUI)
+- **Typographie** : police système sans serif
+- **Thème** : shadcn neutral, composants standards, accent orange discret
 
 ## Installation locale
 
@@ -33,7 +29,7 @@ npm install
 npm run dev
 ```
 
-Le serveur de dev proxy les appels `/api` vers `http://localhost:8000`.
+Le serveur de dev proxy les appels `/api` vers `http://127.0.0.1:8000`.
 Pour le backend PHP local :
 
 ```bash
@@ -82,8 +78,8 @@ Chaque push sur `main` déclenche le build et le déploiement automatique.
 
 ```
 ├── index.html                    # Page principale
-├── style.css                     # Tailwind + thème DaisyUI
-├── script.js                     # Logique frontend
+├── src/index.css                 # Tailwind + thème de l’application
+├── src/                          # Écrans React, composants shadcn et client API
 ├── vite.config.js                # Configuration Vite
 ├── schema.sql                    # Structure de la base de données
 ├── .htaccess                     # Sécurité et HTTPS
@@ -100,6 +96,48 @@ Chaque push sur `main` déclenche le build et le déploiement automatique.
 └── .github/workflows/
     └── deploy.yml                # Déploiement automatique
 ```
+
+## Refonte mobile (React + shadcn/ui)
+
+Le frontend utilise désormais React, les composants shadcn/ui et Tailwind CSS.
+Les endpoints PHP et le schéma de base de données sont conservés à l’identique.
+La navigation utilise des URL avec `#` pour rester compatible avec l’hébergement PHP existant.
+
+### Développement
+
+`npm run dev` utilise désormais une API **locale** sur `http://127.0.0.1:8000`.
+Configurer `api/config.php` avec une base de développement, puis lancer `php -S 127.0.0.1:8000`.
+Pour une autre API de développement, définir `API_PROXY_TARGET` avant de lancer Vite.
+Ne pas pointer les tests de mutation vers la production.
+
+### Démonstration sans MySQL
+
+Dans deux terminaux :
+
+```sh
+node scripts/demo.mjs
+```
+
+```sh
+API_PROXY_TARGET=http://127.0.0.1:8018 VITE_DEMO=true npm run dev -- --port 5180
+```
+
+L’API de démonstration garde ses changements en mémoire et repart du jeu d’exemple à chaque redémarrage.
+La bannière de démonstration est limitée au serveur de développement. Le build utilise `/api/` normalement.
+
+### Vérification
+
+```sh
+npm test
+npx playwright install chromium
+npm run test:e2e
+npm run build
+```
+
+Les tests navigateur interceptent les appels API avec une bibliothèque de test. Ils ne modifient aucune base réelle.
+Les fichiers de `public/` (manifeste, icônes et service worker) sont copiés automatiquement dans `dist/`.
+Le worker retire le cache obsolète de l’ancienne interface ; la consultation et la modification nécessitent une connexion.
+Le déploiement Hostinger reste celui décrit plus haut. Un push sur `main` déclenche toujours la publication.
 
 ## Import de livres et migration d’une installation existante
 
@@ -144,10 +182,11 @@ conservation des données personnelles, les conflits, les doublons et la provena
 La suppression de `FOR UPDATE` dans l’adaptateur SQLite de test signifie que les
 verrous/concurrences MySQL doivent encore être vérifiés sur un environnement de test MySQL.
 
-Les parcours navigateur sont dans `tests/browser.cjs` (Playwright). Ils utilisent
-une bibliothèque simulée, jamais les données de production, sur un serveur Vite
-local au port 5176. Lancer `npm run dev -- --host 127.0.0.1 --port 5176`, puis
-`npm run test:browser` après installation des dépendances et du navigateur Chromium.
+Les parcours navigateur sont dans `tests/import.spec.js` (Playwright). Ils utilisent
+une bibliothèque simulée, jamais les données de production. `npm run test:browser`
+lance les parcours d’import sur ordinateur et mobile avec le serveur Vite local
+fourni par Playwright. `npm run test:e2e` lance aussi les parcours de l’interface mobile.
+Installer Chromium avec `npx playwright install chromium` si nécessaire.
 
 Contrôle optionnel de l’API publique en lecture seule : `php tests/catalog-live.php`.
 Il vérifie les recherches ISBN, titre/auteur et la liste paginée des autres éditions.
