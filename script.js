@@ -1,3 +1,6 @@
+import { coverHtml, escapeHtml } from './book-cover.mjs';
+import { setupImportManagement } from './import-management.mjs';
+let importManagement;
 // --- État global ---
 let books = [];
 let challenge = null;
@@ -39,12 +42,16 @@ async function api(endpoint, method = 'GET', body = null) {
   const options = { method, headers: { 'Content-Type': 'application/json' } };
   if (body) options.body = JSON.stringify(body);
   const res = await fetch('/api/' + endpoint, options);
-  return res.json();
+  const data = await res.json();
+  if (!res.ok && !data.error) throw new Error('La requête a échoué. Réessaie.');
+  return data;
 }
 
 // --- Chargement des données ---
 async function loadBooks() {
-  books = await api('books.php');
+  const result = await api('books.php');
+  if (!Array.isArray(result)) throw new Error(result.error || 'Chargement des livres impossible');
+  books = result;
 }
 
 async function loadChallengeData() {
@@ -318,10 +325,10 @@ function displayShelf() {
             <div class="pile-book"
                  style="height: ${props.width}px; background-color: ${props.color}; color: ${textColor}; font-size: ${fontSize}px;"
                  ${clickHandler}
-                 title="${book.title} — ${book.author}">
+                 title="${escapeHtml(book.title)} — ${escapeHtml(book.author)}">
               ${starsHtml}
-              <span class="pile-book-title">${book.title}</span>
-              <span class="pile-book-author" style="color: ${textColorDim};">${getLastName(book.author)}</span>
+              <span class="pile-book-title">${escapeHtml(book.title)}</span>
+              <span class="pile-book-author" style="color: ${textColorDim};">${escapeHtml(getLastName(book.author))}</span>
             </div>
           `;
         });
@@ -352,12 +359,12 @@ function displayShelf() {
         <div class="book-spine"
              style="width: ${props.width}px; height: ${props.height}px; background-color: ${props.color}; color: ${textColor};"
              ${clickHandler}
-             title="${book.title} — ${book.author}">
+             title="${escapeHtml(book.title)} — ${escapeHtml(book.author)}">
           <div class="book-author-vertical" style="font-size: ${authorFontSize}px; color: ${textColorDim};">
-            ${getLastName(book.author)}
+            ${escapeHtml(getLastName(book.author))}
           </div>
           <div class="book-title-vertical" style="font-size: ${fontSize}px;">
-            ${book.title}
+            ${escapeHtml(book.title)}
           </div>
           ${ratingHtml}
         </div>
@@ -487,6 +494,7 @@ async function saveBookEdit() {
 
 // --- Navigation ---
 function showPage(pageId) {
+  if (pageId === 'import-page') importManagement?.renderList();
   document.querySelectorAll(".page").forEach((page) => {
     page.classList.remove("active");
   });
@@ -494,7 +502,11 @@ function showPage(pageId) {
     tab.classList.remove("tab-active");
   });
   document.getElementById(pageId).classList.add("active");
-  event.target.classList.add("tab-active");
+  document.querySelectorAll("[role='tab']").forEach(tab => {
+    const active = tab.getAttribute('onclick') === `showPage('${pageId}')`;
+    if (active) tab.classList.add('tab-active');
+    tab.setAttribute('aria-selected', String(active));
+  });
 
   if (pageId === "home-page") {
     loadCurrentlyReading().then(() => displayCurrentlyReading());
@@ -599,16 +611,16 @@ function displayBooks() {
   const filterLabels = { read: 'Lus', unread: 'Non lus', rated: 'Notés', gift: 'Cadeaux' };
   let activeBadges = '';
   if (bookFilter.status !== 'all') activeBadges += `<span class="badge badge-sm gap-1">${filterLabels[bookFilter.status]}<button onclick="clearBookFilter('status')" class="text-error font-bold">×</button></span>`;
-  if (bookFilter.genre !== 'all') activeBadges += `<span class="badge badge-sm gap-1">${bookFilter.genre}<button onclick="clearBookFilter('genre')" class="text-error font-bold">×</button></span>`;
-  if (bookFilter.author !== 'all') activeBadges += `<span class="badge badge-sm gap-1">${bookFilter.author}<button onclick="clearBookFilter('author')" class="text-error font-bold">×</button></span>`;
-  if (bookFilter.search) activeBadges += `<span class="badge badge-sm gap-1">"${bookFilter.search}"<button onclick="clearBookFilter('search')" class="text-error font-bold">×</button></span>`;
+  if (bookFilter.genre !== 'all') activeBadges += `<span class="badge badge-sm gap-1">${escapeHtml(bookFilter.genre)}<button onclick="clearBookFilter('genre')" class="text-error font-bold">×</button></span>`;
+  if (bookFilter.author !== 'all') activeBadges += `<span class="badge badge-sm gap-1">${escapeHtml(bookFilter.author)}<button onclick="clearBookFilter('author')" class="text-error font-bold">×</button></span>`;
+  if (bookFilter.search) activeBadges += `<span class="badge badge-sm gap-1">"${escapeHtml(bookFilter.search)}"<button onclick="clearBookFilter('search')" class="text-error font-bold">×</button></span>`;
 
   stats.innerHTML = `
     <div class="flex flex-col gap-3 w-full mb-4">
       <div class="flex flex-wrap items-center gap-2">
         <label class="input input-sm flex items-center gap-2 flex-1 min-w-48 max-w-sm">
           <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 opacity-40" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-          <input type="text" placeholder="Rechercher un titre ou auteur..." value="${bookFilter.search}" oninput="applyBookFilter('search', this.value)" class="grow bg-transparent outline-none text-sm" />
+          <input type="text" placeholder="Rechercher un titre ou auteur..." value="${escapeHtml(bookFilter.search)}" oninput="applyBookFilter('search', this.value)" class="grow bg-transparent outline-none text-sm" />
         </label>
         <select class="select select-sm" onchange="applyBookFilter('status', this.value)">
           <option value="all" ${bookFilter.status === 'all' ? 'selected' : ''}>Statut</option>
@@ -619,11 +631,11 @@ function displayBooks() {
         </select>
         <select class="select select-sm" onchange="applyBookFilter('genre', this.value)">
           <option value="all" ${bookFilter.genre === 'all' ? 'selected' : ''}>Genre</option>
-          ${sortedGenres.map(g => `<option value="${g}" ${bookFilter.genre === g ? 'selected' : ''}>${g}</option>`).join('')}
+          ${sortedGenres.map(g => `<option value="${escapeHtml(g)}" ${bookFilter.genre === g ? 'selected' : ''}>${escapeHtml(g)}</option>`).join('')}
         </select>
         <select class="select select-sm" onchange="applyBookFilter('author', this.value)">
           <option value="all" ${bookFilter.author === 'all' ? 'selected' : ''}>Auteur</option>
-          ${sortedAuthors.map(a => `<option value="${a}" ${bookFilter.author === a ? 'selected' : ''}>${a}</option>`).join('')}
+          ${sortedAuthors.map(a => `<option value="${escapeHtml(a)}" ${bookFilter.author === a ? 'selected' : ''}>${escapeHtml(a)}</option>`).join('')}
         </select>
         <select class="select select-sm" onchange="applyBookSort(this.value)">
           <option value="title-asc" ${sortValue === 'title-asc' ? 'selected' : ''}>Titre A → Z</option>
@@ -663,11 +675,8 @@ function displayBooks() {
       (book) => `
         <div class="card card-border bg-base-100 transition-all hover:border-primary hover:-translate-y-0.5 ${book.is_read ? "opacity-50" : ""}">
           <div class="card-body p-5">
+            <div class="catalog-preview">${coverHtml(book)}<div class="min-w-0 flex-1"><h3 class="font-medium">${escapeHtml(book.title)}</h3><p class="text-sm opacity-60">${escapeHtml(book.author)}</p>${book.isbn ? `<p class="text-xs mt-2">ISBN ${escapeHtml(book.isbn)}</p>` : ''}${book.publisher ? `<p class="text-xs opacity-70">${escapeHtml(book.publisher)}${book.published_date ? ' · ' + escapeHtml(book.published_date) : ''}</p>` : ''}</div></div>
             <div class="flex justify-between items-start gap-2">
-              <h3 class="card-title text-base">
-                ${book.title}
-                ${book.is_read ? '<span class="text-xs font-normal text-success"> — Lu</span>' : ""}
-              </h3>
               <div class="flex items-center gap-1 shrink-0">
                 <button onclick="toggleRead(${book.id})" class="btn btn-xs ${book.is_read ? "btn-success" : "btn-outline"}" title="${book.is_read ? "Marquer non lu" : "Marquer comme lu"}">
                   ${book.is_read ? "✓ Lu" : "Marquer lu"}
@@ -678,7 +687,7 @@ function displayBooks() {
               </div>
             </div>
             <div class="flex justify-between items-center">
-              <p class="text-sm opacity-60">${book.author}</p>
+
               ${!book.is_read && (book.is_gift || book.year) ? `
               <div class="flex items-center gap-2 text-sm opacity-70">
                 ${book.is_gift ? giftSvg() : ""}
@@ -689,7 +698,7 @@ function displayBooks() {
               ${book.genres
                 .map(
                   (genre) =>
-                    `<span class="badge badge-outline badge-sm">${genre}</span>`
+                    `<span class="badge badge-outline badge-sm">${escapeHtml(genre)}</span>`
                 )
                 .join("")}
             </div>
@@ -745,8 +754,8 @@ function displayCurrentlyReading() {
           <div class="flex items-start gap-3">
             <div class="w-3 rounded-sm self-stretch flex-shrink-0" style="background:${color};"></div>
             <div class="flex-1 min-w-0">
-              <h3 class="font-medium text-sm truncate">${cr.title}</h3>
-              <p class="text-xs opacity-50">${cr.author}</p>
+              <h3 class="font-medium text-sm truncate">${escapeHtml(cr.title)}</h3>
+              <p class="text-xs opacity-50">${escapeHtml(cr.author)}</p>
               <div class="flex items-center gap-2 mt-2">
                 <div class="flex-1 bg-base-300 h-2 rounded-full overflow-hidden">
                   <div class="h-full rounded-full transition-all duration-500" style="width:${pctClamped}%;background:${color};"></div>
@@ -758,7 +767,7 @@ function displayCurrentlyReading() {
                 <span class="text-[10px] opacity-40">Jour ${days}</span>
               </div>
               <div class="flex items-center gap-1 mt-3">
-                <button onclick="openProgressModal(${cr.book_id}, '${cr.title.replace(/'/g, "\\'")}', ${cr.current_page}, ${totalPages})" class="btn btn-xs btn-ghost">
+                <button onclick="openProgressModal(${cr.book_id}, ${escapeHtml(JSON.stringify(cr.title))}, ${cr.current_page}, ${totalPages})" class="btn btn-xs btn-ghost">
                   <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                   Avancée
                 </button>
@@ -826,8 +835,8 @@ function renderReadingSelectorList(query) {
   container.innerHTML = filtered.map(b => `
     <div class="flex items-center justify-between p-2 hover:bg-base-200 cursor-pointer" onclick="startReading(${b.id})">
       <div class="min-w-0">
-        <div class="text-sm font-medium truncate">${b.title}</div>
-        <div class="text-xs opacity-50">${b.author}${b.page_count ? ' · ' + b.page_count + ' p.' : ''}</div>
+        <div class="text-sm font-medium truncate">${escapeHtml(b.title)}</div>
+        <div class="text-xs opacity-50">${escapeHtml(b.author)}${b.page_count ? ' · ' + b.page_count + ' p.' : ''}</div>
       </div>
       <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 opacity-30 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
     </div>
@@ -1194,7 +1203,7 @@ async function displayStats() {
           ${storageSegments.map(s => `
             <div class="flex items-center gap-1.5 text-xs">
               <span class="w-2 h-2 flex-shrink-0" style="background:${s.color};"></span>
-              <span>${s.genre}</span>
+              <span>${escapeHtml(s.genre)}</span>
               <span class="opacity-40">${s.count} · ${Math.round(s.pct)}%</span>
             </div>
           `).join("")}
@@ -1214,7 +1223,7 @@ async function displayStats() {
           <div class="bg-base-200 p-4 text-center">
             <div class="text-2xl font-bold">${longestBook.pages}</div>
             <div class="text-[10px] uppercase opacity-50 tracking-wide mb-1">pages</div>
-            <div class="text-xs font-medium truncate">${longestBook.book.title}</div>
+            <div class="text-xs font-medium truncate">${escapeHtml(longestBook.book.title)}</div>
             <div class="text-[10px] opacity-40">Le plus long</div>
           </div>`;
   }
@@ -1223,7 +1232,7 @@ async function displayStats() {
           <div class="bg-base-200 p-4 text-center">
             <div class="text-2xl font-bold">${shortestBook.pages}</div>
             <div class="text-[10px] uppercase opacity-50 tracking-wide mb-1">pages</div>
-            <div class="text-xs font-medium truncate">${shortestBook.book.title}</div>
+            <div class="text-xs font-medium truncate">${escapeHtml(shortestBook.book.title)}</div>
             <div class="text-[10px] opacity-40">Le plus court</div>
           </div>`;
   }
@@ -1330,7 +1339,7 @@ async function displayStats() {
               const readByAuthor = authorReadCounts[author] || 0;
               return `
                 <div class="flex items-center gap-3">
-                  <span class="text-xs w-24 truncate text-right flex-shrink-0">${author}</span>
+                  <span class="text-xs w-24 truncate text-right flex-shrink-0">${escapeHtml(author)}</span>
                   <div class="flex-1 bg-base-200 h-5 relative overflow-hidden">
                     <div class="h-full bg-primary/30" style="width:${w}%;"></div>
                     <div class="h-full bg-primary/70 absolute top-0 left-0" style="width:${Math.max(2, (readByAuthor / maxAuthorCount) * 100)}%;"></div>
@@ -1368,7 +1377,7 @@ async function displayStats() {
               }
               return `
                 <div class="flex items-center justify-between p-2 ${i === 0 ? 'bg-warning/8' : 'bg-base-200'}">
-                  <span class="text-sm font-medium">${genre}</span>
+                  <span class="text-sm font-medium">${escapeHtml(genre)}</span>
                   <div class="flex items-center gap-1">
                     <div class="flex">${stars}</div>
                     <span class="text-xs font-medium ml-1">${avg.toFixed(1)}</span>
@@ -1399,7 +1408,7 @@ async function displayStats() {
           <div class="flex flex-col gap-2">
             ${top5.map(([genre, s]) => `
               <div class="flex items-center gap-3">
-                <span class="text-xs w-20 truncate text-right flex-shrink-0">${genre}</span>
+                <span class="text-xs w-20 truncate text-right flex-shrink-0">${escapeHtml(genre)}</span>
                 <div class="flex-1 bg-base-200 h-4 overflow-hidden">
                   <div class="h-full bg-error/50" style="width:${(s.unread / maxUnread) * 100}%;"></div>
                 </div>
@@ -1425,7 +1434,7 @@ async function displayStats() {
               ${toExplore.map(([genre, , pct]) =>
                 `<div class="flex flex-col items-center gap-1">
                   ${svgGauge(pct, `${pct}%`, '', 64, '#8b5cf6')}
-                  <span class="text-[10px] font-medium text-center max-w-16 truncate">${genre}</span>
+                  <span class="text-[10px] font-medium text-center max-w-16 truncate">${escapeHtml(genre)}</span>
                 </div>`
               ).join('')}
             </div>
@@ -1446,7 +1455,7 @@ async function displayStats() {
             ${fullyRead.map(([genre, s]) => `
               <span class="badge badge-success gap-1">
                 <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
-                ${genre} (${s.total})
+                ${escapeHtml(genre)} (${s.total})
               </span>
             `).join('')}
           </div>
@@ -1626,7 +1635,7 @@ async function displayStats() {
         `<div class="flex flex-col gap-[2px]">${week.map(cell => {
           if (cell === null) return '<div style="width:10px;height:10px;"></div>';
           const bg = heatColor(cell.pages);
-          const booksAttr = cell.books.length > 0 ? ` data-books="${cell.books.map(b => `${b.title} (${b.pages}p)`).join('||').replace(/"/g, '&quot;')}"` : '';
+          const booksAttr = cell.books.length > 0 ? ` data-books="${cell.books.map(b => `${escapeHtml(b.title)} (${b.pages}p)`).join('||').replace(/"/g, '&quot;')}"` : '';
           return `<div class="heatmap-cell" style="width:10px;height:10px;background:${bg};border-radius:2px;" data-date="${cell.date}" data-pages="${cell.pages}"${booksAttr}></div>`;
         }).join('')}</div>`
       ).join('');
@@ -1804,7 +1813,7 @@ function displayWishlist() {
         <div class="card card-border bg-base-100 transition-all hover:border-primary hover:-translate-y-0.5">
           <div class="card-body p-5">
             <div class="flex justify-between items-start gap-2">
-              <h3 class="card-title text-base">${book.title}</h3>
+              ${coverHtml(book, true)}<h3 class="card-title text-base">${escapeHtml(book.title)}</h3>
               <div class="flex items-center gap-1 shrink-0">
                 <button onclick="markAsBought(${book.id})" class="btn btn-xs btn-primary" title="Marquer comme acheté">
                   Acheté
@@ -1814,12 +1823,12 @@ function displayWishlist() {
                 </button>
               </div>
             </div>
-            <p class="text-sm opacity-60">${book.author}</p>
+            <p class="text-sm opacity-60">${escapeHtml(book.author)}</p>
             <div class="flex flex-wrap gap-1 mt-1">
               ${book.genres
                 .map(
                   (genre) =>
-                    `<span class="badge badge-outline badge-sm">${genre}</span>`
+                    `<span class="badge badge-outline badge-sm">${escapeHtml(genre)}</span>`
                 )
                 .join("")}
             </div>
@@ -1930,7 +1939,8 @@ function selectAddColorSwatch(color) {
 }
 
 // --- Ajouter un livre ---
-async function addBook() {
+async function addBook(button) {
+  const btn = button || document.querySelector('[onclick="addBook(this)"]');
   const titleEl = document.getElementById("book-title");
   const authorEl = document.getElementById("book-author");
   const genresEl = document.getElementById("book-genres");
@@ -1995,7 +2005,6 @@ async function addBook() {
   await loadBooks();
   displayBooks();
 
-  const btn = event.target.closest(".btn") || event.target;
   const originalText = btn.innerHTML;
   btn.innerHTML = "✓ Ajouté";
   btn.classList.remove("btn-primary");
@@ -2116,10 +2125,10 @@ function showQuizResults() {
       <div class="flex justify-between items-center p-3 bg-base-200 rounded-sm border border-base-300 ${book.is_read ? 'opacity-50' : ''}">
         <div class="flex-1">
           <div class="font-medium text-sm flex items-center gap-2">
-            <span>${book.title}</span>
+            <span>${escapeHtml(book.title)}</span>
             ${book.is_read ? '<span class="text-xs text-success">Lu</span>' : ''}
           </div>
-          <div class="text-xs opacity-60">${book.author}</div>
+          <div class="text-xs opacity-60">${escapeHtml(book.author)}</div>
         </div>
         ${book.rating ? `<div class="text-xs opacity-60">${'★'.repeat(book.rating)}${'☆'.repeat(5 - book.rating)}</div>` : ''}
       </div>
@@ -2228,12 +2237,12 @@ function displayChallenge() {
         <div class="flex justify-between items-center p-3 bg-base-200 rounded-sm mb-2 border border-base-300 ${book.is_read ? "opacity-50" : ""}">
           <div class="flex-1">
             <div class="font-medium text-sm flex items-center gap-2">
-              <span>${book.title}</span>
+              <span>${escapeHtml(book.title)}</span>
               ${!book.is_read && book.is_gift ? giftSvg("w-3.5 h-3.5 opacity-70") : ""}
               ${!book.is_read && book.year ? `<span class="text-xs opacity-70 font-normal">${book.year}</span>` : ""}
               ${book.is_read ? '<span class="text-xs font-normal text-success"> — Lu</span>' : ""}
             </div>
-            <div class="text-xs opacity-60">${book.author}</div>
+            <div class="text-xs opacity-60">${escapeHtml(book.author)}</div>
           </div>
           <div class="flex items-center gap-1">
             <button onclick="toggleReadAndRefreshChallenge(${book.id})" class="btn btn-xs ${book.is_read ? "btn-success" : "btn-outline"}" title="${book.is_read ? "Marquer non lu" : "Marquer lu"}">
@@ -2435,8 +2444,8 @@ function renderBookSelectorList(query) {
       (book) => `
       <div class="flex justify-between items-center p-3 rounded-sm mb-1 cursor-pointer transition-all border border-base-300 hover:border-primary" onclick="addToChallenge(${book.id}); closeBookSelector();">
         <div>
-          <div class="font-medium text-sm">${book.title}</div>
-          <div class="text-xs opacity-60">${book.author}</div>
+          <div class="font-medium text-sm">${escapeHtml(book.title)}</div>
+          <div class="text-xs opacity-60">${escapeHtml(book.author)}</div>
         </div>
         <span class="text-primary text-lg">+</span>
       </div>
@@ -2472,7 +2481,7 @@ function displayLoans() {
   const lib = libraryBooks();
   select.innerHTML = '<option disabled selected>Choisir un livre...</option>';
   lib.sort((a, b) => a.title.localeCompare(b.title, 'fr')).forEach(b => {
-    select.innerHTML += `<option value="${b.id}">${b.title} — ${b.author}</option>`;
+    select.innerHTML += `<option value="${b.id}">${escapeHtml(b.title)} — ${escapeHtml(b.author)}</option>`;
   });
 
   // Set default date to today
@@ -2495,8 +2504,8 @@ function displayLoans() {
         <div class="card card-border bg-base-100">
           <div class="card-body p-4 flex-row items-center justify-between gap-4">
             <div class="flex-1">
-              <div class="font-medium text-sm">${loan.title}</div>
-              <div class="text-xs opacity-60">${loan.author}</div>
+              <div class="font-medium text-sm">${escapeHtml(loan.title)}</div>
+              <div class="text-xs opacity-60">${escapeHtml(loan.author)}</div>
               <div class="text-xs mt-1">
                 <span class="badge badge-sm badge-outline">${loan.person}</span>
                 <span class="opacity-40 ml-2">depuis le ${new Date(loan.loan_date).toLocaleDateString('fr-FR')} (${days}j)</span>
@@ -2521,7 +2530,7 @@ function displayLoans() {
       html += `
         <div class="flex items-center justify-between p-3 bg-base-100 rounded-sm border border-base-300 opacity-50">
           <div class="flex-1">
-            <span class="text-sm">${loan.title}</span>
+            <span class="text-sm">${escapeHtml(loan.title)}</span>
             <span class="text-xs opacity-60 ml-2">— ${loan.person}</span>
           </div>
           <div class="text-xs opacity-40">
@@ -2624,6 +2633,10 @@ window.dnfReading = dnfReading;
 
 // --- Initialisation ---
 document.addEventListener("DOMContentLoaded", async () => {
+  importManagement = setupImportManagement({
+    getBooks: () => books, reloadBooks: loadBooks, api, showPage,
+    refreshLibrary: () => { displayBooks(); displayShelf(); displayWishlist(); },
+  });
   await Promise.all([loadBooks(), loadChallengeData(), loadCurrentlyReading()]);
   displayCurrentlyReading();
   displayShelf();

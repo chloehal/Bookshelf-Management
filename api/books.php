@@ -5,7 +5,7 @@ $method = $_SERVER['REQUEST_METHOD'];
 
 switch ($method) {
     case 'GET':
-        $stmt = $pdo->query('SELECT id, title, author, genres, is_read, year, is_gift, is_wishlist, rating, page_count, color, size FROM books ORDER BY title ASC');
+        $stmt = $pdo->query('SELECT id, title, author, genres, is_read, year, is_gift, is_wishlist, rating, page_count, color, size, isbn, publisher, published_date, cover_url, metadata_source, metadata_source_id, metadata_snapshot, metadata_linked_at FROM books ORDER BY title ASC');
         $books = $stmt->fetchAll();
         foreach ($books as &$book) {
             $book['id'] = (int) $book['id'];
@@ -17,6 +17,7 @@ switch ($method) {
             $book['page_count'] = $book['page_count'] ? (int) $book['page_count'] : null;
             $book['size'] = $book['size'] ? (int) $book['size'] : null;
             $book['genres'] = json_decode($book['genres']);
+            $book['metadata_snapshot'] = $book['metadata_snapshot'] ? json_decode($book['metadata_snapshot'], true) : null;
         }
         echo json_encode($books);
         break;

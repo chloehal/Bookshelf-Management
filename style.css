@@ -288,3 +288,30 @@ code, pre, kbd, .font-mono, .badge {
     opacity: 0;
   }
 }
+
+/* Long external titles and subjects must stay readable in reconciliation. */
+.catalog-value { white-space: normal; overflow-wrap: anywhere; min-width: 10rem; max-width: 24rem; }
+[hidden] { display: none !important; }
+
+/* Show the complete edition artwork without cropping it. */
+.catalog-preview { display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem; }
+.book-cover { position: relative; width: 112px; aspect-ratio: 2 / 3; flex-shrink: 0; overflow: hidden; border: 1px solid var(--color-base-300); border-radius: 3px 7px 7px 3px; box-shadow: 2px 3px 7px #0002; background: var(--color-base-200); margin: 0; }
+.book-cover-small { width: 72px; }
+.book-cover img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; background: var(--color-base-200); }
+.book-cover-fallback { height: 100%; display: flex; flex-direction: column; justify-content: center; padding: 10px; border-left: 5px solid var(--color-primary); gap: 7px; overflow-wrap: anywhere; }
+.book-cover-title { font-size: 12px; font-weight: 600; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
+.book-cover-author, .book-cover-note { font-size: 9px; line-height: 1.25; }
+.book-cover-note { opacity: .55; margin-top: auto; }
+.book-cover-small .book-cover-fallback { padding: 6px; gap: 4px; }
+.book-cover-small .book-cover-title { font-size: 10px; -webkit-line-clamp: 3; }
+.book-cover-small .book-cover-author { font-size: 8px; }
+.book-cover-small .book-cover-note { display: none; }
+@media (max-width: 600px) {
+  #reconciliation-fields table, #reconciliation-fields tbody, #reconciliation-fields tr, #reconciliation-fields th, #reconciliation-fields td { display: block; width: 100%; min-width: 0; max-width: none; }
+  #reconciliation-fields thead { display: none; }
+  #reconciliation-fields caption { display: block; width: 100%; }
+  #reconciliation-fields tr { padding: 12px 0; border-bottom: 1px solid var(--color-base-300); }
+  #reconciliation-fields td:nth-child(2)::before { content: "Ma fiche : "; font-weight: 600; }
+  #reconciliation-fields td:nth-child(3)::before { content: "Open Library : "; font-weight: 600; }
+  #reconciliation-fields fieldset { flex-direction: row; flex-wrap: wrap; gap: 1rem; }
+}

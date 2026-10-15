@@ -52,6 +52,8 @@
           <button role="tab" class="tab" onclick="showPage('loans-page')">
             Emprunts
           </button>
+          <button role="tab" class="tab" onclick="showPage('import-page')">Import Management</button>
+          <button role="tab" class="tab" onclick="showPage('reconciliation-page')">Réconciliation</button>
         </div>
       </header>
 
@@ -92,9 +94,22 @@
 
       <!-- Page Liste des Livres -->
       <div id="list-page" class="page">
+        <section class="card card-border bg-base-100 mb-6" aria-labelledby="isbn-heading">
+          <div class="card-body">
+            <h2 id="isbn-heading" class="card-title">Ajouter par ISBN</h2>
+            <p class="text-sm opacity-70">Recherche une édition dans Open Library, puis vérifie sa fiche avant de l’ajouter.</p>
+            <form id="isbn-search-form" class="flex flex-wrap items-end gap-3 mt-2">
+              <label class="flex-1 min-w-48"><span class="label">ISBN-10 ou ISBN-13</span><input id="new-isbn" class="input w-full" placeholder="978-…" required maxlength="32"></label>
+              <button class="btn btn-primary" data-catalog-search type="submit">Rechercher par ISBN</button>
+            </form>
+            <p id="isbn-status" role="status" aria-live="polite" class="text-sm"></p>
+            <div id="isbn-results"></div>
+          </div>
+        </section>
         <div class="card card-border bg-base-100 mb-6">
           <div class="card-body">
-            <h2 class="card-title">Ajouter un livre</h2>
+            <h2 class="card-title">Ajouter un livre manuellement</h2>
+            <p class="text-sm opacity-70">Sans ISBN ou sans résultat dans l’API, encode librement ta fiche ici.</p>
             <div class="grid gap-4 md:grid-cols-3">
               <input
                 type="text"
@@ -172,7 +187,7 @@
               </div>
             </div>
             <div class="card-actions mt-4">
-              <button onclick="addBook()" class="btn btn-primary">
+              <button onclick="addBook(this)" class="btn btn-primary">
                 Ajouter à la bibliothèque
               </button>
             </div>
@@ -188,6 +203,57 @@
           class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3"
         ></div>
       </div>
+
+      <section id="import-page" class="page" aria-labelledby="import-heading">
+        <h2 id="import-heading" class="text-2xl mb-2">Import Management</h2>
+        <p class="text-sm mb-4">Transforme une fiche manuelle en fiche liée à Open Library. Choisis une édition, puis réconcilie chaque champ. Les notes, lectures, emprunts, cadeaux et années d’acquisition sont conservés.</p>
+        <p id="import-feedback" role="status" aria-live="polite" class="text-sm mb-3"></p>
+        <p id="import-summary" class="text-sm opacity-70 mb-3"></p>
+        <div class="flex flex-wrap gap-3 mb-4">
+          <label><span class="label">Afficher</span><select id="import-filter" class="select"><option value="manual">Fiches manuelles</option><option value="linked">Fiches liées à l’API</option><option value="all">Toutes les fiches</option></select></label>
+          <label class="flex-1"><span class="label">Filtrer les fiches</span><input id="import-filter-search" class="input w-full" type="search" placeholder="Titre, auteur ou ISBN"></label>
+        </div>
+        <div id="import-books" class="grid gap-3"></div>
+        <section id="import-search-panel" class="card card-border bg-base-100 my-6" hidden>
+          <div class="card-body">
+            <h3 id="import-target" class="card-title"></h3>
+            <form id="import-isbn-form" class="flex flex-wrap items-end gap-3">
+              <label class="flex-1"><span class="label">ISBN de ton édition</span><input id="import-isbn" class="input w-full" maxlength="32" required placeholder="ISBN-10 ou ISBN-13"></label>
+              <button class="btn btn-primary" type="submit" data-catalog-search>Rechercher par ISBN</button>
+            </form>
+            <p class="text-sm mt-3">Pas d’ISBN ? Recherche par titre et auteur, puis vérifie l’édition proposée.</p>
+            <form id="import-title-form" class="grid sm:grid-cols-3 gap-3 items-end">
+              <label><span class="label">Titre</span><input id="import-title" class="input w-full" required minlength="2" maxlength="255"></label>
+              <label><span class="label">Auteur</span><input id="import-author" class="input w-full" maxlength="255"></label>
+              <button class="btn btn-outline" type="submit" data-catalog-search>Rechercher titre / auteur</button>
+            </form>
+            <p id="import-search-status" role="status" aria-live="polite" class="text-sm mt-3"></p>
+            <div id="import-results"></div>
+          </div>
+        </section>
+      </section>
+
+      <section id="reconciliation-page" class="page" aria-labelledby="reconciliation-heading">
+        <h2 id="reconciliation-heading" class="text-2xl mb-4" tabindex="-1">Réconciliation</h2>
+        <div id="reconciliation-empty" class="card card-border bg-base-100 p-6">
+          <p class="mb-4">Choisis une fiche et une édition dans Import Management pour comparer leurs informations.</p>
+          <button type="button" class="btn btn-primary self-start" onclick="showPage('import-page')">Ouvrir Import Management</button>
+        </div>
+        <div id="reconciliation-content" hidden>
+          <p class="mb-4 text-sm">Source : <a id="reconciliation-source" class="link" target="_blank" rel="noopener noreferrer">Open Library</a>. Les informations d’une édition peuvent être incomplètes.</p>
+          <form id="reconciliation-form" class="card card-border bg-base-100">
+            <div class="card-body">
+              <div id="reconciliation-fields"></div>
+              <p class="text-sm opacity-70 mt-4">Ta progression, tes notes, tes emprunts et les caractéristiques de ton exemplaire restent conservés.</p>
+              <p id="reconciliation-status" role="status" aria-live="polite" class="text-sm"></p>
+              <div class="card-actions mt-4 gap-3">
+                <button id="reconciliation-save" type="submit" class="btn btn-primary">Enregistrer mes choix et lier la fiche</button>
+                <button id="reconciliation-cancel" type="button" class="btn btn-ghost">Annuler</button>
+              </div>
+            </div>
+          </form>
+        </div>
+      </section>
 
       <!-- Page Wishlist -->
       <div id="wishlist-page" class="page">
