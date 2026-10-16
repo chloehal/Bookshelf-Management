@@ -1,14 +1,18 @@
 <?php
-require_once __DIR__ . '/catalog-bnf.php';
+require_once __DIR__ . '/catalog-sudoc.php';
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');
 if ($_SERVER['REQUEST_METHOD'] !== 'GET') { http_response_code(405); echo json_encode(['error' => 'Méthode non autorisée']); exit; }
 try {
-    if (isset($_GET['bnf'])) {
+    if (isset($_GET['sudoc'])) {
+        catalog_source_url('sudoc', $_GET['sudoc']);
+        $xml = catalog_sudoc_fetch('/' . $_GET['sudoc'] . '.xml');
+        echo json_encode(['items'=>$xml === null ? [] : [catalog_sudoc_parse($xml)]]);
+    } elseif (isset($_GET['bnf'])) {
         catalog_source_url('bnf', $_GET['bnf']);
         echo json_encode(['items'=>catalog_bnf_search('bib.ark all "ark:/12148/' . $_GET['bnf'] . '"')]);
     } elseif (isset($_GET['isbn'])) {
-        echo json_encode(['items'=>catalog_isbn_sources($_GET['isbn'])]);
+        echo json_encode(['items'=>catalog_search_isbn($_GET['isbn'])]);
     } elseif (isset($_GET['work'])) {
         if (!preg_match('/^OL\d+W$/', $_GET['work'])) throw new InvalidArgumentException('Œuvre invalide');
         $offset = max(0, min(10000, (int) ($_GET['offset'] ?? 0)));

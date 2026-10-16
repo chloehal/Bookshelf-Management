@@ -37,7 +37,20 @@ async function setup(
             "https://openapi.bnf.fr/couverture/image/image/recupererImage?idArk=ark%3A%2F12148%2Fcb485048536&couverture=1",
           cover_retrieved_at: "2026-10-16",
         }
-      : candidate;
+      : provider === "sudoc"
+        ? {
+            ...candidate,
+            source: "sudoc",
+            source_id: "292390726",
+            title: "Les passeurs de livres de Daraya",
+            author: "Delphine Minoui",
+            isbn: "9791041426027",
+            page_count: 177,
+            publisher: "Édition points",
+            published_date: "2025",
+            cover_url: null,
+          }
+        : candidate;
   const lookups = [];
   await page.route("https://openapi.bnf.fr/**", (route) =>
     route.fulfill({
@@ -356,5 +369,41 @@ test("un ISBN absent d’Open Library peut être ajouté puis réconcilié depui
   ).toBeVisible();
   expect(
     state.lookups.some((query) => query.includes("bnf=cb485048536")),
+  ).toBeTruthy();
+});
+
+test("une fiche Sudoc peut être ajoutée puis comparée à nouveau", async ({
+  page,
+}) => {
+  const state = await setup(page, { provider: "sudoc" });
+  await page.getByLabel("ISBN-10 ou ISBN-13").fill("9791041426027");
+  await page
+    .getByRole("button", { name: "Rechercher par ISBN", exact: true })
+    .click();
+  await page.getByRole("button", { name: "Vérifier avant ajout" }).click();
+  await expect(
+    page.getByRole("link", { name: "Voir l’édition dans Sudoc" }),
+  ).toHaveAttribute("href", "https://www.sudoc.fr/292390726");
+  await expect(page.getByLabel("Nombre de pages", { exact: true })).toHaveValue(
+    "177",
+  );
+  await page
+    .getByRole("button", { name: "Ajouter à la bibliothèque", exact: true })
+    .click();
+  await page
+    .getByRole("combobox", { name: "Afficher", exact: true })
+    .selectOption("linked");
+  await expect(
+    page.getByRole("region", { name: "Fiches existantes" }),
+  ).toContainText("Liée à Sudoc");
+  expect(state.writes[0].candidate.source).toBe("sudoc");
+  await page.getByRole("button", { name: "Comparer à nouveau" }).click();
+  await expect(
+    page.getByRole("heading", {
+      name: "Réconcilier « Les passeurs de livres de Daraya »",
+    }),
+  ).toBeVisible();
+  expect(
+    state.lookups.some((query) => query.includes("sudoc=292390726")),
   ).toBeTruthy();
 });

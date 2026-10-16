@@ -19,6 +19,7 @@ function catalog_isbn($value) {
 }
 function catalog_source_url($source, $id) {
     if ($source === 'openlibrary' && preg_match('/^OL\d+M$/', $id)) return 'https://openlibrary.org/books/' . $id;
+    if ($source === 'sudoc' && preg_match('/^\d{8}[\dX]$/', $id)) return 'https://www.sudoc.fr/' . $id;
     if ($source === 'bnf' && preg_match('/^cb\d{8}[0-9a-z]$/', $id)) return 'https://catalogue.bnf.fr/ark:/12148/' . $id;
     throw new InvalidArgumentException('Source bibliographique invalide');
 }

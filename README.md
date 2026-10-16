@@ -240,3 +240,23 @@ Sources : [API SRU](https://api.bnf.fr/fr/api-sru-catalogue-general) et
 Les tests hors réseau utilisent une notice simplifiée du cas `9782266311281`
 (Lux, Maxime Chattam, Pocket 2025, 665 pages). Contrôle réel en lecture seule :
 `php tests/bnf-live.php`.
+
+
+### Catalogue Sudoc (Abes)
+
+La recherche par ISBN consulte également le Sudoc si Open Library et la BnF ne
+trouvent pas de fiche, ou si leur recherche échoue. Le service public ne demande
+pas de clé API. Les notices sont retenues uniquement si elles contiennent l’ISBN
+recherché. La source Sudoc reste visible et « Comparer à nouveau » recharge sa notice.
+L’ajout manuel, les choix champ par champ et la conversion automatique des
+progressions de lecture restent disponibles. Aucune nouvelle migration SQL.
+
+Le Sudoc ne fournit pas de couverture dans cet import ; la couverture locale est
+conservée lors de la réconciliation. Sa pagination correspond à celle de sa notice
+(par exemple 177 pages pour `9791041426027`), qui peut différer des sites marchands.
+Tous les ISBN ne sont pas nécessairement présents, même dans trois catalogues.
+
+Documentation : [services Abes](https://abes.fr/api-et-web-services/) et
+[notices UNIMARC XML](https://fil.abes.fr/2018/06/13/exposition-des-donnees-sudoc-nouveau-webservice/).
+Tests hors réseau : `php tests/sudoc-test.php`. Contrôle réel en lecture seule :
+`php tests/sudoc-live.php` (aucune écriture en base).

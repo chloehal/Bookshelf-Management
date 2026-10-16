@@ -1,0 +1,221 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<record>
+  <leader>     cam0 22        450 </leader>
+  <controlfield tag="001">292390726</controlfield>
+  <controlfield tag="002">15,62,68</controlfield>
+  <controlfield tag="003">https://www.sudoc.fr/292390726</controlfield>
+  <controlfield tag="004">20251208</controlfield>
+  <controlfield tag="005">20260407150558.000</controlfield>
+  <controlfield tag="006">335222103</controlfield>
+  <controlfield tag="007">674821001</controlfield>
+  <controlfield tag="008">Aax3</controlfield>
+  <datafield tag="010" ind1="#" ind2="#">
+    <subfield code="a">979-10-414-2602-7</subfield>
+    <subfield code="b">broché</subfield>
+  </datafield>
+  <datafield tag="034" ind1=" " ind2=" ">
+    <subfield code="a">OCoLC</subfield>
+    <subfield code="0">1559669272</subfield>
+  </datafield>
+  <datafield tag="073" ind1="#" ind2="0">
+    <subfield code="a">9791041426027</subfield>
+  </datafield>
+  <datafield tag="100" ind1="#" ind2="#">
+    <subfield code="a">20251208d2025    m  y0frey50      ba</subfield>
+  </datafield>
+  <datafield tag="101" ind1="0" ind2="#">
+    <subfield code="a">fre</subfield>
+    <subfield code="2">639-2</subfield>
+  </datafield>
+  <datafield tag="102" ind1="#" ind2="#">
+    <subfield code="a">FR</subfield>
+  </datafield>
+  <datafield tag="104" ind1="#" ind2="#">
+    <subfield code="a">m</subfield>
+    <subfield code="b">y</subfield>
+    <subfield code="c">y</subfield>
+    <subfield code="d">ba</subfield>
+    <subfield code="e">0</subfield>
+    <subfield code="f">fre</subfield>
+  </datafield>
+  <datafield tag="105" ind1="#" ind2="#">
+    <subfield code="a">y   ||||000zy</subfield>
+  </datafield>
+  <datafield tag="106" ind1="#" ind2="#">
+    <subfield code="a">r</subfield>
+  </datafield>
+  <datafield tag="181" ind1="#" ind2="#">
+    <subfield code="6">z01</subfield>
+    <subfield code="c">txt</subfield>
+    <subfield code="2">rdacontent</subfield>
+  </datafield>
+  <datafield tag="181" ind1="#" ind2="1">
+    <subfield code="6">z01</subfield>
+    <subfield code="a">i#</subfield>
+    <subfield code="b">xxxe##</subfield>
+  </datafield>
+  <datafield tag="182" ind1="#" ind2="#">
+    <subfield code="6">z01</subfield>
+    <subfield code="c">n</subfield>
+    <subfield code="2">rdamedia</subfield>
+  </datafield>
+  <datafield tag="182" ind1="#" ind2="1">
+    <subfield code="6">z01</subfield>
+    <subfield code="a">n</subfield>
+  </datafield>
+  <datafield tag="183" ind1="#" ind2="#">
+    <subfield code="6">z01</subfield>
+    <subfield code="a">nga</subfield>
+    <subfield code="2">RDAfrCarrier</subfield>
+  </datafield>
+  <datafield tag="200" ind1="1" ind2="#">
+    <subfield code="a">Les passeurs de livres de daraya</subfield>
+    <subfield code="e">une bibliothèque secrète en Syrie</subfield>
+    <subfield code="e">récit</subfield>
+    <subfield code="f">Delphine Minoui</subfield>
+  </datafield>
+  <datafield tag="214" ind1="#" ind2="0">
+    <subfield code="a">[Paris]</subfield>
+    <subfield code="c">Édition points</subfield>
+    <subfield code="d">DL 2025</subfield>
+  </datafield>
+  <datafield tag="215" ind1="#" ind2="#">
+    <subfield code="a">1 volume (177 pages)</subfield>
+    <subfield code="c">couverture illustrée en couleurs</subfield>
+    <subfield code="d">18 cm</subfield>
+  </datafield>
+  <datafield tag="225" ind1="2" ind2="#">
+    <subfield code="a">Points</subfield>
+    <subfield code="v">4876</subfield>
+  </datafield>
+  <datafield tag="305" ind1="#" ind2="#">
+    <subfield code="a">Éditions Points mentionné en 4e de couverture, malgré la mention édition du Seuil en page de titre</subfield>
+  </datafield>
+  <datafield tag="305" ind1="#" ind2="#">
+    <subfield code="a">Publié pour la 1re fois en 2017 aux éditions Seuil</subfield>
+  </datafield>
+  <datafield tag="306" ind1="#" ind2="#">
+    <subfield code="a">Numérotation dans la collection principale : 4876</subfield>
+  </datafield>
+  <datafield tag="330" ind1="#" ind2="#">
+    <subfield code="a">Bachar al-Assad s&apos;était juré de les enterrer vivants, d&apos;ensevelir leur ville et leurs espoirs. Daraya, un des berceaux du printemps syrien de 2011, à sept kilomètres de Damas, est devenu un tombeau à ciel ouvert. Mais sous les bombes, les derniers insoumis assiégés ont bâti une forteresse de papier pour résister : pendant quatre années de blocus, Ahmad, Shadi, Hussam ou Omar ont exhumé des milliers d&apos;ouvrages ensevelis sous les décombres de la ville et les ont rassemblés dans une bibliothèque secrète, calfeutrée dans un sous-sol. Au coeur du chaos, un refuge où la parole circule, contre les atrocités, l&apos;absurde, l&apos;oubli...</subfield>
+    <subfield code="2">4e de couverture</subfield>
+  </datafield>
+  <datafield tag="410" ind1="#" ind2="#">
+    <subfield code="0">001031767</subfield>
+    <subfield code="t">Points (Paris)</subfield>
+    <subfield code="x">0768-0481</subfield>
+    <subfield code="v">4876</subfield>
+  </datafield>
+  <datafield tag="410" ind1="#" ind2="#">
+    <subfield code="0">265307503</subfield>
+    <subfield code="t">Points. Récit (2021)</subfield>
+    <subfield code="x">2968-1758</subfield>
+  </datafield>
+  <datafield tag="579" ind1=" " ind2=" ">
+    <subfield code="1">0499</subfield>
+    <subfield code="3">231830688</subfield>
+    <subfield code="t">Les passeurs de livres de Daraya, une bibliothèque secrète en Syrie</subfield>
+  </datafield>
+  <datafield tag="606" ind1="#" ind2="#">
+    <subfield code="3">027873471</subfield>
+    <subfield code="a">Résistance passive</subfield>
+    <subfield code="3">027761614</subfield>
+    <subfield code="y">Damas (Syrie)</subfield>
+    <subfield code="3">033466300</subfield>
+    <subfield code="z">1990-2020</subfield>
+    <subfield code="2">rameau</subfield>
+  </datafield>
+  <datafield tag="606" ind1="#" ind2="#">
+    <subfield code="3">02723715X</subfield>
+    <subfield code="a">Livres et lecture</subfield>
+    <subfield code="3">027761614</subfield>
+    <subfield code="y">Damas (Syrie)</subfield>
+    <subfield code="3">033466300</subfield>
+    <subfield code="z">1990-2020</subfield>
+    <subfield code="2">rameau</subfield>
+  </datafield>
+  <datafield tag="607" ind1="#" ind2="#">
+    <subfield code="3">161314120</subfield>
+    <subfield code="a">Syrie</subfield>
+    <subfield code="z">2011-.... (Guerre civile)</subfield>
+    <subfield code="2">rameau</subfield>
+  </datafield>
+  <datafield tag="608" ind1="#" ind2="#">
+    <subfield code="3">171871855</subfield>
+    <subfield code="a">Récit personnel</subfield>
+    <subfield code="2">rameau</subfield>
+  </datafield>
+  <datafield tag="676" ind1="#" ind2="#">
+    <subfield code="a">320.956</subfield>
+    <subfield code="v">23</subfield>
+  </datafield>
+  <datafield tag="686" ind1="#" ind2="#">
+    <subfield code="1">62</subfield>
+    <subfield code="a">G</subfield>
+  </datafield>
+  <datafield tag="700" ind1="#" ind2="1">
+    <subfield code="3">056599269</subfield>
+    <subfield code="a">Minoui</subfield>
+    <subfield code="b">Delphine</subfield>
+    <subfield code="f">1974-....</subfield>
+    <subfield code="4">070</subfield>
+  </datafield>
+  <datafield tag="801" ind1="#" ind2="3">
+    <subfield code="a">FR</subfield>
+    <subfield code="b">Abes</subfield>
+    <subfield code="c">20260407</subfield>
+    <subfield code="g">AFNOR</subfield>
+  </datafield>
+  <datafield tag="930" ind1="#" ind2="#">
+    <subfield code="5">335222103:869846086</subfield>
+    <subfield code="b">335222103</subfield>
+    <subfield code="j">u</subfield>
+  </datafield>
+  <datafield tag="940" ind1=" " ind2=" ">
+    <subfield code="5">335222103:869846086</subfield>
+    <subfield code="a">20251208</subfield>
+    <subfield code="b">x</subfield>
+  </datafield>
+  <datafield tag="941" ind1=" " ind2=" ">
+    <subfield code="5">335222103:869846086</subfield>
+    <subfield code="a">20251208</subfield>
+    <subfield code="b">15:04:45.000</subfield>
+  </datafield>
+  <datafield tag="915" ind1="#" ind2="#">
+    <subfield code="5">674821001:882170635</subfield>
+    <subfield code="b">36701025104370</subfield>
+  </datafield>
+  <datafield tag="930" ind1="#" ind2="#">
+    <subfield code="5">674821001:882170635</subfield>
+    <subfield code="b">674821001</subfield>
+    <subfield code="l">LIVP</subfield>
+    <subfield code="j">u</subfield>
+  </datafield>
+  <datafield tag="940" ind1=" " ind2=" ">
+    <subfield code="5">674821001:882170635</subfield>
+    <subfield code="a">20260407</subfield>
+    <subfield code="b">x</subfield>
+  </datafield>
+  <datafield tag="941" ind1=" " ind2=" ">
+    <subfield code="5">674821001:882170635</subfield>
+    <subfield code="a">20260407</subfield>
+    <subfield code="b">15:05:12.000</subfield>
+  </datafield>
+  <datafield tag="930" ind1="#" ind2="#">
+    <subfield code="5">372612101:877638101</subfield>
+    <subfield code="b">372612101</subfield>
+    <subfield code="a">R MIN</subfield>
+    <subfield code="j">u</subfield>
+  </datafield>
+  <datafield tag="940" ind1=" " ind2=" ">
+    <subfield code="5">372612101:877638101</subfield>
+    <subfield code="a">20260305</subfield>
+    <subfield code="b">x</subfield>
+  </datafield>
+  <datafield tag="941" ind1=" " ind2=" ">
+    <subfield code="5">372612101:877638101</subfield>
+    <subfield code="a">20260305</subfield>
+    <subfield code="b">15:30:07.000</subfield>
+  </datafield>
+</record>

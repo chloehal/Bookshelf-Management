@@ -83,3 +83,12 @@ test("BnF provenance and cover URLs stay scoped to the official service", async 
     null,
   );
 });
+
+test("Sudoc provenance only accepts a PPN", async () => {
+  const { catalogSourceInfo } = await import("../catalog.mjs");
+  assert.deepEqual(catalogSourceInfo("sudoc", "292390726"), {
+    label: "Sudoc",
+    url: "https://www.sudoc.fr/292390726",
+  });
+  assert.equal(catalogSourceInfo("sudoc", "../../evil").url, null);
+});

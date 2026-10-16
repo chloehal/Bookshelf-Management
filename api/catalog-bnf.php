@@ -71,7 +71,8 @@ function catalog_isbn_sources($isbn, $primary = null, $secondary = null) {
     $isbn = catalog_isbn($isbn);
     $primary ??= fn() => catalog_lookup('ISBN:' . $isbn);
     $secondary ??= fn() => catalog_bnf_search('bib.isbn all "' . $isbn . '"');
-    try { $book = $primary(); if ($book) return [$book]; } catch (RuntimeException $e) {}
+    $primaryFailure = null;
+    try { $book = $primary(); if ($book) return [$book]; } catch (RuntimeException $e) { $primaryFailure = $e; }
     // Preserve a secondary outage as an error, not an apparent catalogue miss.
     $books = $secondary();
     $matches = [];
@@ -81,5 +82,6 @@ function catalog_isbn_sources($isbn, $primary = null, $secondary = null) {
             $matches[] = $book;
         }
     }
+    if (!$matches && $primaryFailure) throw $primaryFailure;
     return $matches;
 }

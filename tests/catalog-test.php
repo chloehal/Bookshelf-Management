@@ -91,3 +91,19 @@ $keepBnf = $db->query('SELECT * FROM books WHERE id = ' . (int) $bnfId)->fetch()
 catalog_import($db, ['id'=>$bnfId, 'candidate'=>$otherSource, 'expected'=>catalog_values($keepBnf), 'choices'=>['title'=>'api']]);
 $keptSnapshot = json_decode($db->query('SELECT metadata_snapshot FROM books WHERE id = ' . (int) $bnfId)->fetchColumn(),true);
 check(($keptSnapshot['cover_provenance']['retrieved_at'] ?? null) === $bnf['cover_retrieved_at'], 'Retaining a local BnF cover also retains its retrieval date when provider changes');
+
+require_once __DIR__ . '/../api/catalog-sudoc.php';
+$sudoc = catalog_sudoc_parse(file_get_contents(__DIR__ . '/fixtures/sudoc-daraya.xml'));
+$db->exec("INSERT INTO books (title, author, genres, page_count, cover_url, year, rating, is_read) VALUES ('Daraya local', 'Delphine Minoui', '[\"Récit\"]', 192, 'https://covers.openlibrary.org/b/id/123-M.jpg?default=false', 2025, 4, 0)");
+$sudocId = (int)$db->lastInsertId();
+$db->exec("INSERT INTO currently_reading (id,book_id,current_page) VALUES (10,$sudocId,96)");
+$db->exec("INSERT INTO reading_log (id,book_id,pages_read) VALUES (10,$sudocId,96)");
+$sudocLocal = $db->query('SELECT * FROM books WHERE id = '.$sudocId)->fetch();
+catalog_import($db, ['id'=>$sudocId,'candidate'=>$sudoc,'expected'=>catalog_values($sudocLocal),'choices'=>['page_count'=>'api','isbn'=>'api','cover_url'=>'api','title'=>'local']]);
+$savedSudoc = $db->query('SELECT * FROM books WHERE id = '.$sudocId)->fetch();
+check($savedSudoc['metadata_source'] === 'sudoc' && $savedSudoc['metadata_source_id'] === '292390726', 'Persist Sudoc provenance');
+check($savedSudoc['title'] === 'Daraya local' && $savedSudoc['cover_url'] === $sudocLocal['cover_url'], 'Sudoc reconciliation preserves local title and missing artwork');
+check($savedSudoc['rating'] === 4 && $savedSudoc['year'] === 2025, 'Sudoc preserves personal fields');
+check((int)$db->query('SELECT current_page FROM currently_reading WHERE book_id = '.$sudocId)->fetchColumn() === 89, 'Sudoc pagination converts reading position 96/192 to 89/177');
+check((int)$db->query('SELECT pages_read FROM reading_log WHERE id = 10')->fetchColumn() === 96, 'Sudoc conversion preserves reading history');
+echo "Sudoc persistence and reading reconciliation tests passed\n";
