@@ -74,7 +74,8 @@ export function ImportPage({ data, route, navigate, mutate, busy, reload }) {
         : (
             await api.request(
               "catalog.php?" +
-                (item.lookup_source === "bnf" ? "bnf=" : "olid=") +
+                ({ bnf: "bnf=", sudoc: "sudoc=" }[item.lookup_source] ||
+                  "olid=") +
                 encodeURIComponent(item.source_id),
             )
           ).items[0];

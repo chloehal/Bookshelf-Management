@@ -74,6 +74,8 @@ export function convertProgress(page, oldTotal, newTotal) {
 }
 
 export function catalogSourceInfo(source = "openlibrary", id = "") {
+  if (source === "sudoc" && /^\d{8}[\dX]$/.test(id))
+    return { label: "Sudoc", url: `https://www.sudoc.fr/${id}` };
   if (source === "bnf" && /^cb\d{8}[0-9a-z]$/.test(id))
     return { label: "BnF", url: `https://catalogue.bnf.fr/ark:/12148/${id}` };
   if (source === "openlibrary" && /^OL\d+M$/.test(id))
