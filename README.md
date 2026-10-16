@@ -240,3 +240,9 @@ Sources : [API SRU](https://api.bnf.fr/fr/api-sru-catalogue-general) et
 Les tests hors réseau utilisent une notice simplifiée du cas `9782266311281`
 (Lux, Maxime Chattam, Pocket 2025, 665 pages). Contrôle réel en lecture seule :
 `php tests/bnf-live.php`.
+
+Si Open Library reconnaît un ISBN mais n’a pas sa couverture, la BnF peut compléter
+uniquement l’image, pour ce même ISBN, sans remplacer le titre, l’auteur ou la
+pagination de la fiche Open Library. Le crédit BnF reste conservé pour cette image.
+Les fiches déjà liées peuvent récupérer la couverture via « Comparer à nouveau »,
+puis le choix de la couverture API dans la réconciliation.
