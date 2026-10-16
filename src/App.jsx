@@ -169,7 +169,7 @@ export default function App() {
     [
       "reconciliation",
       "Réconciliation",
-      "Comparer mes données avec Open Library",
+      "Comparer mes données avec les catalogues",
       RefreshCw,
     ],
   ];

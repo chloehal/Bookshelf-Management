@@ -1,10 +1,15 @@
 <?php
-require_once __DIR__ . '/catalog-lib.php';
+require_once __DIR__ . '/catalog-bnf.php';
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');
 if ($_SERVER['REQUEST_METHOD'] !== 'GET') { http_response_code(405); echo json_encode(['error' => 'Méthode non autorisée']); exit; }
 try {
-    if (isset($_GET['work'])) {
+    if (isset($_GET['bnf'])) {
+        catalog_source_url('bnf', $_GET['bnf']);
+        echo json_encode(['items'=>catalog_bnf_search('bib.ark all "ark:/12148/' . $_GET['bnf'] . '"')]);
+    } elseif (isset($_GET['isbn'])) {
+        echo json_encode(['items'=>catalog_isbn_sources($_GET['isbn'])]);
+    } elseif (isset($_GET['work'])) {
         if (!preg_match('/^OL\d+W$/', $_GET['work'])) throw new InvalidArgumentException('Œuvre invalide');
         $offset = max(0, min(10000, (int) ($_GET['offset'] ?? 0)));
         $data = catalog_fetch('/works/' . $_GET['work'] . '/editions.json?' . http_build_query(['limit' => 20, 'offset' => $offset]));
@@ -44,5 +49,5 @@ try {
 } catch (InvalidArgumentException $e) {
     http_response_code(400); echo json_encode(['error' => $e->getMessage()]);
 } catch (Throwable $e) {
-    http_response_code(502); echo json_encode(['error' => 'La recherche Open Library a échoué. Réessaie dans un instant.']);
+    http_response_code(502); echo json_encode(['error' => 'La recherche bibliographique a échoué. Réessaie dans un instant.']);
 }

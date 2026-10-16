@@ -72,3 +72,14 @@ export function convertProgress(page, oldTotal, newTotal) {
     ? Math.round(Math.min(1, page / oldTotal) * newTotal)
     : Math.min(page, newTotal);
 }
+
+export function catalogSourceInfo(source = "openlibrary", id = "") {
+  if (source === "bnf" && /^cb\d{8}[0-9a-z]$/.test(id))
+    return { label: "BnF", url: `https://catalogue.bnf.fr/ark:/12148/${id}` };
+  if (source === "openlibrary" && /^OL\d+M$/.test(id))
+    return {
+      label: "Open Library",
+      url: `https://openlibrary.org/books/${id}`,
+    };
+  return { label: "API", url: null };
+}

@@ -11,6 +11,7 @@ import {
   reconciliationPayload,
   hasValue,
   convertProgress,
+  catalogSourceInfo,
 } from "../../catalog.mjs";
 
 const text = (value) =>
@@ -37,7 +38,7 @@ export function ImportPage({ data, route, navigate, mutate, busy, reload }) {
     lock.current = true;
     setPending(true);
     setError("");
-    setMessage("Recherche dans Open Library…");
+    setMessage("Recherche dans les catalogues…");
     try {
       const result = await api.request(
         "catalog.php?" + new URLSearchParams(params),
@@ -72,7 +73,9 @@ export function ImportPage({ data, route, navigate, mutate, busy, reload }) {
         ? item
         : (
             await api.request(
-              "catalog.php?olid=" + encodeURIComponent(item.source_id),
+              "catalog.php?" +
+                (item.lookup_source === "bnf" ? "bnf=" : "olid=") +
+                encodeURIComponent(item.source_id),
             )
           ).items[0];
       if (!full)
@@ -129,13 +132,23 @@ export function ImportPage({ data, route, navigate, mutate, busy, reload }) {
     setError("");
     setMessage("");
     if (book?.metadata_source_id)
-      select({ source_id: book.metadata_source_id }, book);
+      select(
+        {
+          source_id: book.metadata_source_id,
+          lookup_source: book.metadata_source,
+        },
+        book,
+      );
   }
   const duplicate =
     candidate &&
     data.books.find((book) => {
       if (book.id === target?.id) return false;
-      if (book.metadata_source_id === candidate.source_id) return true;
+      if (
+        book.metadata_source === candidate.source &&
+        book.metadata_source_id === candidate.source_id
+      )
+        return true;
       try {
         return (
           book.isbn &&
@@ -180,7 +193,7 @@ export function ImportPage({ data, route, navigate, mutate, busy, reload }) {
       }
       await mutate(
         () => api.request("book-import.php", "POST", payload),
-        "Livre enregistré et lié à Open Library.",
+        "Livre enregistré et lié à sa source bibliographique.",
       );
       setCandidate(null);
       setItems([]);
@@ -215,7 +228,9 @@ export function ImportPage({ data, route, navigate, mutate, busy, reload }) {
     return (
       <>
         <PageHeading
-          eyebrow="OPEN LIBRARY"
+          eyebrow={
+            catalogSourceInfo(candidate.source, candidate.source_id).label
+          }
           title={
             target
               ? `Réconcilier « ${target.title} »`
@@ -226,11 +241,12 @@ export function ImportPage({ data, route, navigate, mutate, busy, reload }) {
         <p className="mb-6">
           <a
             className="underline"
-            href={`https://openlibrary.org/books/${candidate.source_id}`}
+            href={catalogSourceInfo(candidate.source, candidate.source_id).url}
             target="_blank"
             rel="noreferrer"
           >
-            Voir l’édition dans Open Library
+            Voir l’édition dans{" "}
+            {catalogSourceInfo(candidate.source, candidate.source_id).label}
           </a>
         </p>
         <form className="paper-card import-form" onSubmit={save}>
@@ -284,7 +300,13 @@ export function ImportPage({ data, route, navigate, mutate, busy, reload }) {
                   <div className="reconciliation-values">
                     {[
                       ["local", "Ma fiche", row.current, target],
-                      ["api", "Open Library", row.proposed, candidate],
+                      [
+                        "api",
+                        catalogSourceInfo(candidate.source, candidate.source_id)
+                          .label,
+                        row.proposed,
+                        candidate,
+                      ],
                     ].map(([value, label, field, book]) => (
                       <label key={value} className="reconciliation-value">
                         <span>
@@ -394,7 +416,7 @@ export function ImportPage({ data, route, navigate, mutate, busy, reload }) {
       </div>
       <section
         className="paper-card import-form"
-        aria-label="Recherche Open Library"
+        aria-label="Recherche bibliographique"
       >
         <h2>
           {target ? `Rechercher pour « ${target.title} »` : "Ajouter par ISBN"}
@@ -460,7 +482,9 @@ export function ImportPage({ data, route, navigate, mutate, busy, reload }) {
                 ...item,
                 cover_url:
                   item.cover_url ||
-                  `https://covers.openlibrary.org/b/olid/${item.source_id}-M.jpg?default=false`,
+                  ((item.source || "openlibrary") === "openlibrary"
+                    ? `https://covers.openlibrary.org/b/olid/${item.source_id}-M.jpg?default=false`
+                    : null),
               }}
             />
             <div>
@@ -531,7 +555,7 @@ export function ImportPage({ data, route, navigate, mutate, busy, reload }) {
                 <p>{book.author}</p>
                 <p>
                   {book.metadata_source
-                    ? "Liée à Open Library"
+                    ? `Liée à ${catalogSourceInfo(book.metadata_source, book.metadata_source_id).label}`
                     : "Fiche manuelle"}
                   {book.is_wishlist ? " · Wishlist" : ""}
                 </p>

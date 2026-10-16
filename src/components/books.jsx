@@ -22,6 +22,10 @@ export function BookCover({ book, large = false }) {
   };
   const [failedUrl, setFailedUrl] = useState(null);
   const imageUrl = safeCoverUrl(book.cover_url);
+  const coverDate =
+    book.cover_retrieved_at || book.metadata_snapshot?.cover_provenance?.retrieved_at || book.metadata_snapshot?.cover_retrieved_at;
+  const bnfCover =
+    imageUrl?.startsWith("https://openapi.bnf.fr/") && imageUrl !== failedUrl;
   return (
     <div
       className={`book-cover ${large ? "book-cover-large" : ""}`}
@@ -41,6 +45,11 @@ export function BookCover({ book, large = false }) {
           referrerPolicy="no-referrer"
           onError={() => setFailedUrl(imageUrl)}
         />
+      )}
+      {bnfCover && (
+        <span className="cover-credit">
+          BnF{coverDate ? ` · ${coverDate}` : ""}
+        </span>
       )}
       <span className="cover-face">
         <span className="cover-author">{book.author}</span>

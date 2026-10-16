@@ -222,3 +222,21 @@ Sans ces variables, l’API renvoie un message JSON de configuration manquante.
 
 Le déploiement Git direct Hostinger ne nécessite pas les secrets FTP GitHub :
 ceux-ci concernent seulement le workflow GitHub Actions optionnel.
+
+## Recherche ISBN : complément BnF
+
+Si Open Library ne trouve pas l’ISBN ou est indisponible, l’API interroge
+le catalogue général de la Bibliothèque nationale de France via SRU, sans clé
+ni variable supplémentaire. L’ISBN renvoyé doit correspondre à celui demandé.
+La source BnF, sa notice ARK et la date de récupération de la couverture sont
+conservées. Les fiches BnF utilisent la même prévisualisation, réconciliation et
+conversion automatique de progression que les fiches Open Library.
+Aucune migration MySQL supplémentaire n’est nécessaire.
+
+Les couvertures BnF disponibles portent une mention de provenance et de date ;
+une image indisponible laisse apparaître la couverture typographique habituelle.
+Sources : [API SRU](https://api.bnf.fr/fr/api-sru-catalogue-general) et
+[service Couvertures](https://api.bnf.fr/fr/api-service-couvertures-du-catalogue-general).
+Les tests hors réseau utilisent une notice simplifiée du cas `9782266311281`
+(Lux, Maxime Chattam, Pocket 2025, 665 pages). Contrôle réel en lecture seule :
+`php tests/bnf-live.php`.

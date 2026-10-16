@@ -74,3 +74,20 @@ check((int) $db->query('SELECT current_page FROM currently_reading WHERE book_id
 $readFlag = $db->query('SELECT is_read FROM books WHERE id = 2')->fetchColumn();
 check(!$readFlag, 'Conversion never marks a book finished');
 echo "PHP automatic reading reconciliation tests passed\n";
+
+require_once __DIR__ . '/../api/catalog-bnf.php';
+$bnf = catalog_bnf_parse(file_get_contents(__DIR__ . '/fixtures/bnf-lux.xml'))[0];
+$bnfId = catalog_import($db, ['candidate'=>$bnf])['id'];
+$storedBnf = $db->query('SELECT * FROM books WHERE id = ' . (int) $bnfId)->fetch();
+check($storedBnf['metadata_source'] === 'bnf' && $storedBnf['metadata_source_id'] === 'cb485048536', 'BnF source persisted without schema changes');
+$bnfSnapshot = json_decode($storedBnf['metadata_snapshot'], true);
+check($bnfSnapshot['source_url'] === 'https://catalogue.bnf.fr/ark:/12148/cb485048536' && $bnfSnapshot['cover_retrieved_at'], 'BnF provenance and cover date preserved');
+catalog_import($db, ['id'=>$bnfId,'candidate'=>$bnf,'expected'=>catalog_values($storedBnf),'choices'=>[]]);
+check($db->query('SELECT metadata_source FROM books WHERE id = ' . (int) $bnfId)->fetchColumn() === 'bnf', 'BnF fiche can be reconciled again');
+echo "BnF persistence tests passed\n";
+$otherSource = $candidate; $otherSource['source_id'] = 'OL999M'; $otherSource['isbn'] = $bnf['isbn'];
+$otherSource['cover_url'] = 'https://covers.openlibrary.org/b/id/1-M.jpg?default=false';
+$keepBnf = $db->query('SELECT * FROM books WHERE id = ' . (int) $bnfId)->fetch();
+catalog_import($db, ['id'=>$bnfId, 'candidate'=>$otherSource, 'expected'=>catalog_values($keepBnf), 'choices'=>['title'=>'api']]);
+$keptSnapshot = json_decode($db->query('SELECT metadata_snapshot FROM books WHERE id = ' . (int) $bnfId)->fetchColumn(),true);
+check(($keptSnapshot['cover_provenance']['retrieved_at'] ?? null) === $bnf['cover_retrieved_at'], 'Retaining a local BnF cover also retains its retrieval date when provider changes');

@@ -14,9 +14,37 @@ const candidate = {
   cover_url: "https://covers.openlibrary.org/b/id/123-M.jpg?default=false",
 };
 test.setTimeout(60000);
-async function setup(page, { incomplete = false } = {}) {
+async function setup(
+  page,
+  { incomplete = false, provider = "openlibrary" } = {},
+) {
   const data = structuredClone(fixture),
     writes = [];
+  const provided =
+    provider === "bnf"
+      ? {
+          ...candidate,
+          source: "bnf",
+          source_id: "cb485048536",
+          title: "Lux",
+          author: "Maxime Chattam",
+          isbn: "9782266311281",
+          page_count: 665,
+          publisher: "Pocket",
+          published_date: "2025",
+          genres: ["thriller"],
+          cover_url:
+            "https://openapi.bnf.fr/couverture/image/image/recupererImage?idArk=ark%3A%2F12148%2Fcb485048536&couverture=1",
+          cover_retrieved_at: "2026-10-16",
+        }
+      : candidate;
+  const lookups = [];
+  await page.route("https://openapi.bnf.fr/**", (route) =>
+    route.fulfill({
+      contentType: "image/svg+xml",
+      body: '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="300"><rect width="200" height="300" fill="#d5c69a"/></svg>',
+    }),
+  );
   let failSearch = false,
     failSave = false;
   await page.route("https://covers.openlibrary.org/**", (r) =>
@@ -27,16 +55,17 @@ async function setup(page, { incomplete = false } = {}) {
       url = new URL(req.url()),
       name = url.pathname.split("/").pop();
     if (name === "catalog.php") {
+      lookups.push(url.search);
       if (failSearch)
         return route.fulfill({
           status: 502,
           json: { error: "API indisponible" },
         });
       const items = url.searchParams.has("title")
-        ? [{ ...candidate, source: undefined, work_id: "OL42W" }]
+        ? [{ ...provided, source: undefined, work_id: "OL42W" }]
         : url.searchParams.has("work")
-          ? [{ ...candidate, source: undefined, publisher: "Autre édition" }]
-          : [candidate];
+          ? [{ ...provided, source: undefined, publisher: "Autre édition" }]
+          : [provided];
       return route.fulfill({
         json: {
           items: incomplete
@@ -81,7 +110,7 @@ async function setup(page, { incomplete = false } = {}) {
           );
           current.page_count = book.page_count;
         }
-        book.metadata_source = "openlibrary";
+        book.metadata_source = body.candidate.source;
         book.metadata_source_id = body.candidate.source_id;
       } else
         data.books.push({
@@ -89,7 +118,8 @@ async function setup(page, { incomplete = false } = {}) {
           id: 99,
           is_read: false,
           is_wishlist: false,
-          metadata_source: "openlibrary",
+          metadata_source: body.candidate.source,
+          metadata_snapshot: body.candidate,
           metadata_source_id: body.candidate.source_id,
         });
     } else if (name === "books.php" && req.method() === "POST")
@@ -103,6 +133,7 @@ async function setup(page, { incomplete = false } = {}) {
   return {
     data,
     writes,
+    lookups,
     failSearch: (value) => {
       failSearch = value;
     },
@@ -132,7 +163,7 @@ for (const width of [390, 1280])
       .getByRole("button", { name: "Voir les autres éditions" })
       .click();
     await expect(
-      page.getByRole("region", { name: "Recherche Open Library" }),
+      page.getByRole("region", { name: "Recherche bibliographique" }),
     ).toContainText("Autre édition");
     await page.getByRole("button", { name: "Comparer cette édition" }).click();
     await expect(
@@ -290,4 +321,40 @@ test("un conflit recharge la fiche pour permettre une nouvelle comparaison", asy
   await expect(
     page.getByRole("group", { name: "Auteur · Différent", exact: true }),
   ).toBeVisible();
+});
+
+test("un ISBN absent d’Open Library peut être ajouté puis réconcilié depuis la BnF", async ({
+  page,
+}) => {
+  const state = await setup(page, { provider: "bnf" });
+  await page.getByLabel("ISBN-10 ou ISBN-13").fill("978-2-266-31128-1");
+  await page
+    .getByRole("button", { name: "Rechercher par ISBN", exact: true })
+    .click();
+  await page.getByRole("button", { name: "Vérifier avant ajout" }).click();
+  await expect(
+    page.getByRole("link", { name: "Voir l’édition dans BnF" }),
+  ).toHaveAttribute("href", "https://catalogue.bnf.fr/ark:/12148/cb485048536");
+  await expect(page.getByLabel("Titre", { exact: true })).toHaveValue("Lux");
+  await expect(page.getByLabel("Nombre de pages", { exact: true })).toHaveValue(
+    "665",
+  );
+  await expect(page.locator(".cover-credit")).toContainText("BnF · 2026-10-16");
+  await page
+    .getByRole("button", { name: "Ajouter à la bibliothèque", exact: true })
+    .click();
+  await page
+    .getByRole("combobox", { name: "Afficher", exact: true })
+    .selectOption("linked");
+  await expect(
+    page.getByRole("region", { name: "Fiches existantes" }),
+  ).toContainText("Liée à BnF");
+  expect(state.writes[0].candidate.source).toBe("bnf");
+  await page.getByRole("button", { name: "Comparer à nouveau" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Réconcilier « Lux »" }),
+  ).toBeVisible();
+  expect(
+    state.lookups.some((query) => query.includes("bnf=cb485048536")),
+  ).toBeTruthy();
 });

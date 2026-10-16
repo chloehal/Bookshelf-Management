@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<srw:searchRetrieveResponse xmlns:srw="http://www.loc.gov/zing/srw/" xmlns:mxc="info:lc/xmlns/marcxchange-v2">
+<srw:numberOfRecords>1</srw:numberOfRecords><srw:records><srw:record><srw:recordData>
+<mxc:record format="UNIMARC" id="ark:/12148/cb485048536">
+<mxc:datafield tag="010"><mxc:subfield code="a">978-2-266-31128-1</mxc:subfield></mxc:datafield>
+<mxc:datafield tag="200"><mxc:subfield code="a">Lux</mxc:subfield><mxc:subfield code="f">Maxime Chattam</mxc:subfield></mxc:datafield>
+<mxc:datafield tag="214" ind2="0"><mxc:subfield code="c">Pocket</mxc:subfield><mxc:subfield code="d">DL 2025</mxc:subfield></mxc:datafield>
+<mxc:datafield tag="214" ind2="3"><mxc:subfield code="c">Imprimeur à ignorer</mxc:subfield></mxc:datafield>
+<mxc:datafield tag="215"><mxc:subfield code="a">1 vol. (665 p.)</mxc:subfield></mxc:datafield>
+<mxc:datafield tag="225"><mxc:subfield code="a">Pocket</mxc:subfield><mxc:subfield code="e">thriller</mxc:subfield></mxc:datafield>
+<mxc:datafield tag="700"><mxc:subfield code="a">Chattam</mxc:subfield><mxc:subfield code="b">Maxime</mxc:subfield></mxc:datafield>
+<mxc:datafield tag="856"><mxc:subfield code="u">1039345</mxc:subfield><mxc:subfield code="b">Première de couverture</mxc:subfield></mxc:datafield>
+</mxc:record></srw:recordData></srw:record></srw:records></srw:searchRetrieveResponse>

@@ -17,9 +17,21 @@ function catalog_isbn($value) {
     if ($sum % 10) throw new InvalidArgumentException('ISBN invalide');
     return $isbn;
 }
+function catalog_source_url($source, $id) {
+    if ($source === 'openlibrary' && preg_match('/^OL\d+M$/', $id)) return 'https://openlibrary.org/books/' . $id;
+    if ($source === 'bnf' && preg_match('/^cb\d{8}[0-9a-z]$/', $id)) return 'https://catalogue.bnf.fr/ark:/12148/' . $id;
+    throw new InvalidArgumentException('Source bibliographique invalide');
+}
 function catalog_cover_url($value) {
     if (!$value) return null;
     $value = preg_replace('~^http://~', 'https://', (string) $value);
+    $parts = parse_url($value);
+    if (($parts['scheme'] ?? '') === 'https' && ($parts['host'] ?? '') === 'openapi.bnf.fr' && ($parts['path'] ?? '') === '/couverture/image/image/recupererImage' && !isset($parts['user']) && !isset($parts['pass']) && !isset($parts['fragment']) && !isset($parts['port'])) {
+        parse_str($parts['query'] ?? '', $params);
+        if (count($params) === 2 && ($params['couverture'] ?? '') === '1' && is_string($params['idArk'] ?? null) && preg_match('~^ark:/12148/cb\d{8}[0-9a-z]$~', $params['idArk'])) {
+            return 'https://openapi.bnf.fr/couverture/image/image/recupererImage?' . http_build_query(['idArk'=>$params['idArk'],'couverture'=>1]);
+        }
+    }
     if (!preg_match('~^https://covers\.openlibrary\.org/b/(?:id/\d+|olid/OL\d+M)-[SML]\.jpg(?:\?default=false)?$~', $value)) return null;
     return str_contains($value, '?') ? $value : $value . '?default=false';
 }
@@ -54,10 +66,10 @@ function catalog_values($book) {
     return $values;
 }
 function catalog_validate($candidate) {
-    if (!is_array($candidate) || ($candidate['source'] ?? '') !== 'openlibrary' || !preg_match('/^OL\d+M$/', $candidate['source_id'] ?? '')) {
-        throw new InvalidArgumentException('Source Open Library invalide');
-    }
-    $result = ['source' => 'openlibrary', 'source_id' => $candidate['source_id'], 'source_url' => 'https://openlibrary.org/books/' . $candidate['source_id']];
+    if (!is_array($candidate) || !is_string($candidate['source'] ?? null) || !is_string($candidate['source_id'] ?? null)) throw new InvalidArgumentException('Source bibliographique invalide');
+    $url = catalog_source_url($candidate['source'], $candidate['source_id']);
+    $result = ['source'=>$candidate['source'], 'source_id'=>$candidate['source_id'], 'source_url'=>$url];
+    if ($candidate['source'] === 'bnf' && preg_match('/^\d{4}-\d{2}-\d{2}$/', $candidate['cover_retrieved_at'] ?? '')) $result['cover_retrieved_at'] = $candidate['cover_retrieved_at'];
     foreach (CATALOG_FIELDS as $key) {
         $value = $candidate[$key] ?? null;
         if ($key === 'genres') {
