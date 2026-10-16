@@ -12,6 +12,7 @@ import {
   hasValue,
   convertProgress,
   catalogSourceInfo,
+  mergeEditionResults,
 } from "../../catalog.mjs";
 
 const text = (value) =>
@@ -28,32 +29,42 @@ export function ImportPage({ data, route, navigate, mutate, busy, reload }) {
     [query, setQuery] = useState("");
   const [choices, setChoices] = useState({}),
     [draft, setDraft] = useState({});
+  const [warnings, setWarnings] = useState([]);
   const [message, setMessage] = useState(""),
     [error, setError] = useState(""),
     [pending, setPending] = useState(false);
   const lock = useRef(false);
   const disabled = pending || busy;
-  async function lookup(params, book = target) {
+  async function lookup(params, book = target, append = false) {
     if (lock.current || busy) return;
     lock.current = true;
     setPending(true);
     setError("");
+    setWarnings([]);
     setMessage("Recherche dans les catalogues…");
     try {
       const result = await api.request(
         "catalog.php?" + new URLSearchParams(params),
       );
       setTarget(book);
-      setItems(result.items);
+      setItems((current) =>
+        append ? mergeEditionResults(current, result.items) : result.items,
+      );
+      setWarnings(result.warnings || []);
       setNext(
-        result.next_offset != null
-          ? { work: params.work, offset: result.next_offset }
-          : null,
+        result.next ||
+          (result.next_offset != null
+            ? { work: params.work, offset: result.next_offset }
+            : null),
       );
       setMessage(
         result.items.length
-          ? "Vérifie l’édition, l’éditeur et la date avant de choisir."
-          : "Aucun résultat. Essaie un autre ISBN ou un titre. L’ajout manuel reste disponible.",
+          ? params.editions
+            ? "Éditions et correspondances proposées par Open Library, la BnF et le Sudoc. Vérifie le titre, l’auteur, l’ISBN et le format ; des traductions peuvent apparaître."
+            : "Vérifie l’édition, l’éditeur et la date avant de choisir."
+          : append
+            ? "Aucune nouvelle édition sur cette page. Les éditions déjà chargées restent affichées."
+            : "Aucun résultat. Essaie un autre ISBN ou un titre. L’ajout manuel reste disponible.",
       );
     } catch (e) {
       setError(e.message);
@@ -471,6 +482,11 @@ export function ImportPage({ data, route, navigate, mutate, busy, reload }) {
           </form>
         )}
         <p role="status">{message}</p>
+        {warnings.map((warning) => (
+          <p role="status" key={warning}>
+            {warning}
+          </p>
+        ))}
         {error && (
           <p role="alert" className="text-destructive">
             {error}
@@ -491,6 +507,14 @@ export function ImportPage({ data, route, navigate, mutate, busy, reload }) {
             <div>
               <h3>{item.title}</h3>
               <p>{item.author}</p>
+              <p className="text-sm text-muted-foreground">
+                {
+                  catalogSourceInfo(
+                    item.source || item.lookup_source || "openlibrary",
+                    item.source_id,
+                  ).label
+                }
+              </p>
               <p>
                 {[
                   item.publisher,
@@ -505,11 +529,18 @@ export function ImportPage({ data, route, navigate, mutate, busy, reload }) {
                 <Button disabled={disabled} onClick={() => select(item)}>
                   {target ? "Comparer cette édition" : "Vérifier avant ajout"}
                 </Button>
-                {item.work_id && (
+                {item.title && !item.edition_result && (
                   <Button
                     variant="outline"
                     disabled={disabled}
-                    onClick={() => lookup({ work: item.work_id, offset: 0 })}
+                    onClick={() =>
+                      lookup({
+                        editions: 1,
+                        title: item.title,
+                        author: item.author || "",
+                        ...(item.work_id ? { work: item.work_id } : {}),
+                      })
+                    }
                   >
                     Voir les autres éditions
                   </Button>
@@ -522,9 +553,9 @@ export function ImportPage({ data, route, navigate, mutate, busy, reload }) {
           <Button
             variant="outline"
             disabled={disabled}
-            onClick={() => lookup(next)}
+            onClick={() => lookup(next, target, true)}
           >
-            Éditions suivantes
+            Charger les éditions suivantes
           </Button>
         )}
       </section>

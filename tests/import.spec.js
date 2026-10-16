@@ -74,11 +74,20 @@ async function setup(
           status: 502,
           json: { error: "API indisponible" },
         });
-      const items = url.searchParams.has("title")
-        ? [{ ...provided, source: undefined, work_id: "OL42W" }]
-        : url.searchParams.has("work")
-          ? [{ ...provided, source: undefined, publisher: "Autre édition" }]
-          : [provided];
+      const items = url.searchParams.has("editions")
+        ? [
+            {
+              ...provided,
+              source: undefined,
+              edition_result: true,
+              publisher: "Autre édition",
+            },
+          ]
+        : url.searchParams.has("title")
+          ? [{ ...provided, source: undefined, work_id: "OL42W" }]
+          : url.searchParams.has("editions") || url.searchParams.has("work")
+            ? [{ ...provided, source: undefined, publisher: "Autre édition" }]
+            : [provided];
       return route.fulfill({
         json: {
           items: incomplete
@@ -406,4 +415,94 @@ test("une fiche Sudoc peut être ajoutée puis comparée à nouveau", async ({
   expect(
     state.lookups.some((query) => query.includes("sudoc=292390726")),
   ).toBeTruthy();
+});
+
+test("les autres éditions regroupent les catalogues et conservent les pages déjà chargées", async ({
+  page,
+}) => {
+  await setup(page, { provider: "sudoc" });
+  const bnf = {
+    ...candidate,
+    source: "bnf",
+    source_id: "cb485048536",
+    title: "Édition BnF",
+    edition_result: true,
+  };
+  const sudoc = {
+    ...candidate,
+    source: "sudoc",
+    source_id: "292390726",
+    title: "Édition Sudoc",
+    edition_result: true,
+  };
+  const calls = [];
+  await page.route("**/api/catalog.php?**", async (route) => {
+    const params = new URL(route.request().url()).searchParams;
+    if (!params.has("editions")) return route.fallback();
+    calls.push(Object.fromEntries(params));
+    const second = params.has("sudoc_offset");
+    return route.fulfill({
+      json: {
+        items: second
+          ? [bnf, sudoc]
+          : [
+              {
+                ...candidate,
+                title: "Édition Open Library",
+                edition_result: true,
+              },
+              bnf,
+            ],
+        warnings: second
+          ? []
+          : ["Sudoc indisponible : les résultats sont incomplets."],
+        next: second
+          ? null
+          : {
+              editions: 1,
+              title: "Les passeurs de livres de Daraya",
+              author: "Delphine Minoui",
+              openlibrary_offset: -1,
+              bnf_offset: -1,
+              sudoc_offset: 0,
+            },
+      },
+    });
+  });
+  await page.getByLabel("ISBN-10 ou ISBN-13").fill("9791041426027");
+  await page
+    .getByRole("button", { name: "Rechercher par ISBN", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Voir les autres éditions", exact: true })
+    .click();
+  const results = page.getByRole("region", {
+    name: "Recherche bibliographique",
+  });
+  await expect(results).toContainText("Édition Open Library");
+  await expect(results).toContainText("Édition BnF");
+  await expect(results).toContainText("Sudoc indisponible");
+  expect(calls[0].title).toBe("Les passeurs de livres de Daraya");
+  expect(calls[0].author).toBe("Delphine Minoui");
+  await page
+    .getByRole("button", { name: "Charger les éditions suivantes" })
+    .click();
+  await expect(results.locator(".import-result")).toHaveCount(3);
+  await expect(results).toContainText("Édition Open Library");
+  await expect(results).toContainText("Édition Sudoc");
+  await expect(results).not.toContainText("Sudoc indisponible");
+  await expect(
+    page.getByRole("button", { name: "Charger les éditions suivantes" }),
+  ).toHaveCount(0);
+  await results
+    .locator(".import-result")
+    .filter({ hasText: "Édition Sudoc" })
+    .getByRole("button", { name: "Vérifier avant ajout" })
+    .click();
+  await expect(page.getByLabel("Titre", { exact: true })).toHaveValue(
+    "Édition Sudoc",
+  );
+  await expect(
+    page.getByRole("link", { name: "Voir l’édition dans Sudoc" }),
+  ).toBeVisible();
 });
