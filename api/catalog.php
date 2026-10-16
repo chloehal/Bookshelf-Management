@@ -33,6 +33,7 @@ try {
             $key = 'OLID:' . $_GET['olid'];
         }
         $book = catalog_lookup($key);
+        if ($book) $book = catalog_enrich_cover($book);
         echo json_encode(['items' => $book ? [$book] : []]);
     } else {
         $title = catalog_text($_GET['title'] ?? null);

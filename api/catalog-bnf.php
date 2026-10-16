@@ -67,14 +67,7 @@ function catalog_bnf_search($query) {
     if ($xml === false || $status !== 200) throw new RuntimeException('La recherche BnF est indisponible. Réessaie dans un instant.');
     return catalog_bnf_parse($xml);
 }
-function catalog_isbn_sources($isbn, $primary = null, $secondary = null) {
-    $isbn = catalog_isbn($isbn);
-    $primary ??= fn() => catalog_lookup('ISBN:' . $isbn);
-    $secondary ??= fn() => catalog_bnf_search('bib.isbn all "' . $isbn . '"');
-    $primaryFailure = null;
-    try { $book = $primary(); if ($book) return [$book]; } catch (RuntimeException $e) { $primaryFailure = $e; }
-    // Preserve a secondary outage as an error, not an apparent catalogue miss.
-    $books = $secondary();
+function catalog_bnf_isbn_matches($books, $isbn) {
     $matches = [];
     foreach ($books as $book) {
         if (in_array($isbn, $book['isbns'] ?? [$book['isbn'] ?? null], true)) {
@@ -82,6 +75,33 @@ function catalog_isbn_sources($isbn, $primary = null, $secondary = null) {
             $matches[] = $book;
         }
     }
+    return $matches;
+}
+function catalog_enrich_cover($book, $isbn = null, $secondary = null) {
+    if (!empty($book['cover_url'])) return $book;
+    $isbn ??= $book['isbn'] ?? null;
+    if (!$isbn || (!empty($book['isbn']) && $book['isbn'] !== $isbn)) return $book;
+    $secondary ??= fn() => catalog_bnf_search('bib.isbn all "' . catalog_isbn($isbn) . '"');
+    try {
+        foreach (catalog_bnf_isbn_matches($secondary(), $isbn) as $other) {
+            $cover = catalog_cover_url($other['cover_url'] ?? null);
+            if ($cover) {
+                $book['cover_url'] = $cover;
+                $book['cover_retrieved_at'] = $other['cover_retrieved_at'] ?? gmdate('Y-m-d');
+                break;
+            }
+        }
+    } catch (RuntimeException | InvalidArgumentException $e) { /* A missing image must not hide a recognised book. */ }
+    return $book;
+}
+function catalog_isbn_sources($isbn, $primary = null, $secondary = null) {
+    $isbn = catalog_isbn($isbn);
+    $primary ??= fn() => catalog_lookup('ISBN:' . $isbn);
+    $secondary ??= fn() => catalog_bnf_search('bib.isbn all "' . $isbn . '"');
+    $primaryFailure = null;
+    try { $book = $primary(); if ($book) return [catalog_enrich_cover($book, $isbn, $secondary)]; } catch (RuntimeException $e) { $primaryFailure = $e; }
+    // Preserve a secondary outage as an error, not an apparent catalogue miss.
+    $matches = catalog_bnf_isbn_matches($secondary(), $isbn);
     if (!$matches && $primaryFailure) throw $primaryFailure;
     return $matches;
 }
