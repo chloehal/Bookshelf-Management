@@ -69,7 +69,6 @@ function catalog_validate($candidate) {
     if (!is_array($candidate) || !is_string($candidate['source'] ?? null) || !is_string($candidate['source_id'] ?? null)) throw new InvalidArgumentException('Source bibliographique invalide');
     $url = catalog_source_url($candidate['source'], $candidate['source_id']);
     $result = ['source'=>$candidate['source'], 'source_id'=>$candidate['source_id'], 'source_url'=>$url];
-    if ($candidate['source'] === 'bnf' && preg_match('/^\d{4}-\d{2}-\d{2}$/', $candidate['cover_retrieved_at'] ?? '')) $result['cover_retrieved_at'] = $candidate['cover_retrieved_at'];
     foreach (CATALOG_FIELDS as $key) {
         $value = $candidate[$key] ?? null;
         if ($key === 'genres') {
@@ -85,6 +84,7 @@ function catalog_validate($candidate) {
         } else $value = catalog_text($value, $key === 'published_date' ? 100 : 255);
         $result[$key] = $value;
     }
+    if (!empty($result['cover_url']) && str_starts_with($result['cover_url'], 'https://openapi.bnf.fr/') && preg_match('/^\d{4}-\d{2}-\d{2}$/', $candidate['cover_retrieved_at'] ?? '')) $result['cover_retrieved_at'] = $candidate['cover_retrieved_at'];
     return $result;
 }
 function catalog_merge($local, $candidate, $choices) {
