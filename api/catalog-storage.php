@@ -27,12 +27,12 @@ function catalog_import(PDO $pdo, array $data) {
             throw new InvalidArgumentException('Titre, auteur et au moins un genre requis');
         }
         // Protect against two records for the same edition, including legacy ISBN-10.
-        $stmt = $pdo->prepare('SELECT id, title, isbn, metadata_source_id FROM books WHERE id <> ? AND (isbn IS NOT NULL OR metadata_source_id = ?) FOR UPDATE');
+        $stmt = $pdo->prepare('SELECT id, title, isbn, metadata_source, metadata_source_id FROM books WHERE id <> ? AND (isbn IS NOT NULL OR metadata_source_id = ?) FOR UPDATE');
         $stmt->execute([$id, $candidate['source_id']]);
         foreach ($stmt->fetchAll() as $other) {
             $otherIsbn = null;
             try { if ($other['isbn']) $otherIsbn = catalog_isbn($other['isbn']); } catch (InvalidArgumentException $e) {}
-            if ($other['metadata_source_id'] === $candidate['source_id'] || ($candidate['isbn'] && $otherIsbn === $candidate['isbn']) || ($values['isbn'] && $otherIsbn === $values['isbn'])) {
+            if (($other['metadata_source'] === $candidate['source'] && $other['metadata_source_id'] === $candidate['source_id']) || ($candidate['isbn'] && $otherIsbn === $candidate['isbn']) || ($values['isbn'] && $otherIsbn === $values['isbn'])) {
                 throw new CatalogImportException('Cette édition existe déjà : ' . $other['title'], 409);
             }
         }
@@ -55,9 +55,19 @@ function catalog_import(PDO $pdo, array $data) {
                 // Edition conversion is not reading activity: leave reading_log untouched.
             }
         }
+        $snapshot = $candidate;
+        if (!empty($values['cover_url']) && str_starts_with($values['cover_url'], 'https://openapi.bnf.fr/')) {
+            $coverDate = null;
+            if ($values['cover_url'] === ($candidate['cover_url'] ?? null)) $coverDate = $candidate['cover_retrieved_at'] ?? null;
+            if (!$coverDate && $id && $values['cover_url'] === ($local['cover_url'] ?? null)) {
+                $previous = is_string($local['metadata_snapshot'] ?? null) ? json_decode($local['metadata_snapshot'], true) : ($local['metadata_snapshot'] ?? []);
+                $coverDate = $previous['cover_provenance']['retrieved_at'] ?? $previous['cover_retrieved_at'] ?? null;
+            }
+            if ($coverDate) $snapshot['cover_provenance'] = ['source'=>'bnf', 'url'=>$values['cover_url'], 'retrieved_at'=>$coverDate];
+        }
         $columns = CATALOG_FIELDS;
         $params = array_map(fn($key) => $key === 'genres' ? json_encode($values[$key], JSON_UNESCAPED_UNICODE) : $values[$key], $columns);
-        array_push($params, 'openlibrary', $candidate['source_id'], json_encode($candidate, JSON_UNESCAPED_UNICODE));
+        array_push($params, $candidate['source'], $candidate['source_id'], json_encode($snapshot, JSON_UNESCAPED_UNICODE));
         if ($id) {
             $set = implode(', ', array_map(fn($key) => "$key = ?", $columns));
             $stmt = $pdo->prepare("UPDATE books SET $set, metadata_source = ?, metadata_source_id = ?, metadata_snapshot = ?, metadata_linked_at = CURRENT_TIMESTAMP WHERE id = ?");

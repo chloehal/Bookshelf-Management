@@ -2168,3 +2168,5 @@
 .reconciliation-value .book-cover { width: 90px; height: 135px; }
 .import-feedback { padding: 1rem; border: 1px solid var(--border); background: var(--muted); }
 @media(max-width: 600px) { .reconciliation-values { grid-template-columns: 1fr; } .import-result { gap: .75rem; padding: 1rem; } .import-preview { padding: 0; gap: 1rem; } }
+
+.book-cover .cover-credit { display: block; position: absolute; bottom: 0; left: 0; right: 0; z-index: 3; padding: 2px; font-size: 8px; line-height: 1.2; color: #222; background: #ffffffe6; text-align: center; }

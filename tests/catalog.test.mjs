@@ -66,3 +66,20 @@ test("automatic reading conversion preserves fraction or page when old total is 
   assert.equal(convertProgress(120, null, 80), 80);
   assert.equal(convertProgress(500, 300, 400), 400);
 });
+
+test("BnF provenance and cover URLs stay scoped to the official service", async () => {
+  const { catalogSourceInfo } = await import("../catalog.mjs");
+  const { safeCoverUrl } = await import("../book-cover.mjs");
+  assert.equal(
+    catalogSourceInfo("bnf", "cb485048536").url,
+    "https://catalogue.bnf.fr/ark:/12148/cb485048536",
+  );
+  const cover =
+    "https://openapi.bnf.fr/couverture/image/image/recupererImage?idArk=ark%3A%2F12148%2Fcb485048536&couverture=1";
+  assert.equal(safeCoverUrl(cover), cover);
+  assert.equal(safeCoverUrl(cover + "&redirect=evil"), null);
+  assert.equal(
+    safeCoverUrl(cover.replace("openapi.bnf.fr", "openapi.bnf.fr.evil.com")),
+    null,
+  );
+});
