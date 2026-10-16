@@ -85,3 +85,13 @@ export function catalogSourceInfo(source = "openlibrary", id = "") {
     };
   return { label: "API", url: null };
 }
+
+// Keep distinct catalogue notices, while avoiding repeats across loaded pages.
+export function mergeEditionResults(current, incoming) {
+  const records = new Map();
+  for (const item of [...current, ...incoming]) {
+    const source = item.source || item.lookup_source || "openlibrary";
+    records.set(`${source}:${item.source_id}`, item);
+  }
+  return [...records.values()];
+}

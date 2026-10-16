@@ -92,3 +92,19 @@ test("Sudoc provenance only accepts a PPN", async () => {
   });
   assert.equal(catalogSourceInfo("sudoc", "../../evil").url, null);
 });
+
+test("edition pages accumulate without hiding notices from different catalogues", async () => {
+  const { mergeEditionResults } = await import("../catalog.mjs");
+  const ol = { source_id: "OL1M", isbn: "9780306406157" };
+  const bnf = { source: "bnf", source_id: "cb485048536", isbn: ol.isbn };
+  const sudoc = {
+    source: "sudoc",
+    source_id: "292390726",
+    isbn: "9791041426027",
+  };
+  assert.deepEqual(mergeEditionResults([ol, bnf], [bnf, sudoc]), [
+    ol,
+    bnf,
+    sudoc,
+  ]);
+});

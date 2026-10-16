@@ -265,3 +265,26 @@ uniquement l’image, pour ce même ISBN, sans remplacer le titre, l’auteur ou
 pagination de la fiche Open Library. Le crédit BnF reste conservé pour cette image.
 Les fiches déjà liées peuvent récupérer la couverture via « Comparer à nouveau »,
 puis le choix de la couverture API dans la réconciliation.
+
+### Autres éditions dans les trois catalogues
+
+« Voir les autres éditions » est disponible depuis les résultats Open Library,
+BnF et Sudoc. Le bouton recherche dans la liste des éditions de
+l’œuvre Open Library et dans les recherches titre/auteur BnF et Sudoc. Si aucun
+identifiant d’œuvre Open Library n’est disponible, sa recherche titre/auteur sert
+à trouver une œuvre correspondante. Il s’agit de correspondances à vérifier :
+les traductions et les titres proches peuvent apparaître et aucun catalogue ne
+garantit l’exhaustivité de toutes les éditions publiées.
+
+Chaque résultat affiche sa source, son ISBN, son éditeur et sa date si disponibles.
+Les notices de deux sources pour un même ISBN restent distinctes pour pouvoir
+comparer leurs métadonnées. « Charger les éditions suivantes » conserve les
+résultats déjà affichés, suit séparément chaque catalogue et évite de répéter une
+même notice. Les pages SRU respectent `nextRecordPosition` ou le nombre de notices
+réellement reçu. Une source indisponible est signalée, les autres restent utilisables
+et la pagination permet de réessayer la source en échec.
+
+Tests hors réseau : `php tests/editions-test.php`. Contrôle réel en lecture seule :
+`php tests/editions-live.php`.
+
+Goodreads n’est pas intégré : [son API publique ne délivre plus de nouvelles clés](https://www.goodreads.com/topic/show/21788520-api-deprecation).
