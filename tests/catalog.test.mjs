@@ -1,5 +1,68 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+
+test("French editions rank ahead of unknown and other languages, but exact ISBN wins", async () => {
+  const { rankEditionResults } = await import("../catalog.mjs");
+  const books = [
+    { source_id: "OL1M", languages: ["en"], isbn: "9780306406157" },
+    { source_id: "OL2M", languages: [] },
+    { source_id: "OL3M", languages: ["fr"] },
+  ];
+  assert.equal(typeof rankEditionResults, "function");
+  assert.deepEqual(
+    rankEditionResults(books).map((b) => b.source_id),
+    ["OL3M", "OL2M", "OL1M"],
+  );
+  assert.equal(rankEditionResults(books, "9780306406157")[0].source_id, "OL1M");
+});
+test("same ISBN groups sources while preserving conflicting page counts", async () => {
+  const { groupEditionResults } = await import("../catalog.mjs");
+  assert.equal(typeof groupEditionResults, "function");
+  const groups = groupEditionResults([
+    {
+      source: "bnf",
+      source_id: "cb485048536",
+      isbn: "0-306-40615-2",
+      page_count: 192,
+    },
+    {
+      source: "sudoc",
+      source_id: "292390726",
+      isbn: "9780306406157",
+      page_count: 177,
+    },
+    { source_id: "OL1M", isbn: null },
+    { source_id: "OL2M", isbn: null },
+  ]);
+  assert.equal(groups.length, 3);
+  assert.equal(groups[0].notices.length, 2);
+  assert.deepEqual(groups[0].conflicts, ["page_count"]);
+});
+test("different works require confirmation while accents and author punctuation do not", async () => {
+  const { identityConflict } = await import("../catalog.mjs");
+  assert.equal(typeof identityConflict, "function");
+  assert.equal(
+    identityConflict(
+      { title: "La clé USB", author: "Jean-Philippe Toussaint" },
+      { title: "Les passeurs de livres de Daraya", author: "Delphine Minoui" },
+    ),
+    true,
+  );
+  assert.equal(
+    identityConflict(
+      { title: "L’Écume des jours", author: "Boris Vian" },
+      { title: "L'ecume des jours", author: "Vian, Boris" },
+    ),
+    false,
+  );
+  assert.equal(
+    identityConflict(
+      { title: "Dune", author: "Frank Herbert" },
+      { title: "Dune local", author: "Frank Herbert" },
+    ),
+    false,
+  );
+});
 import {
   normalizeIsbn,
   comparisonRows,

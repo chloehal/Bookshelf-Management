@@ -50,14 +50,7 @@ function catalog_editions_xml($source, $query, $offset) {
 }
 function catalog_editions_openlibrary($query, $offset) {
     $work = $query['work'];
-    if (!$work) {
-        $params = ['title'=>$query['title'],'limit'=>1,'fields'=>'key'];
-        if ($query['author']) $params['author'] = $query['author'];
-        $search = catalog_fetch('/search.json?'.http_build_query($params));
-        $work = basename($search['docs'][0]['key'] ?? '');
-        if (!$work) return ['items'=>[], 'total'=>0, 'next_offset'=>null];
-        if (!preg_match('/^OL\d+W$/', $work)) throw new RuntimeException('Œuvre Open Library invalide');
-    }
+    if (!$work) return catalog_search_openlibrary($query,$offset);
     $data = catalog_fetch('/works/'.$work.'/editions.json?'.http_build_query(['limit'=>EDITION_PAGE_SIZE,'offset'=>$offset]));
     $items = [];
     foreach ($data['entries'] ?? [] as $edition) {
@@ -67,6 +60,7 @@ function catalog_editions_openlibrary($query, $offset) {
             try { $isbn = catalog_isbn($value); break; } catch (InvalidArgumentException $e) {}
         }
         $items[] = ['source_id'=>$match[1], 'lookup_source'=>'openlibrary','title'=>$edition['title'] ?? 'Sans titre',
+            'languages'=>catalog_languages($edition['languages'] ?? []),'format'=>$edition['physical_format'] ?? null,
             'author'=>$query['author'],'publisher'=>implode(', ', $edition['publishers'] ?? []),
             'published_date'=>$edition['publish_date'] ?? null,'isbn'=>$isbn,
             'cover_url'=>!empty($edition['covers'][0]) && $edition['covers'][0] > 0 ? 'https://covers.openlibrary.org/b/id/'.(int)$edition['covers'][0].'-M.jpg?default=false' : null];
@@ -110,4 +104,29 @@ function catalog_editions($input, $providers = null) {
     }
     if (!$succeeded && $warnings) throw new RuntimeException('Les catalogues demandés sont indisponibles. Réessaie dans un instant.');
     return ['items'=>array_values($items),'warnings'=>$warnings,'next'=>$pending ? $next : null];
+}
+
+function catalog_search_openlibrary($query, $offset, $fetch = null) {
+    $fetch ??= 'catalog_fetch';
+    $params = ['title'=>$query['title'],'lang'=>'fr','offset'=>$offset,'limit'=>20,
+        'fields'=>'key,title,author_name,editions,editions.key,editions.title,editions.language,editions.isbn,editions.physical_format,editions.publisher,editions.publish_date,editions.cover_i'];
+    if (!empty($query['author'])) $params['author'] = $query['author'];
+    $data = $fetch('/search.json?'.http_build_query($params));
+    $items = [];
+    foreach ($data['docs'] ?? [] as $doc) {
+        foreach ($doc['editions']['docs'] ?? [] as $edition) {
+            if (!preg_match('~(?:^|/)(OL\d+M)$~', $edition['key'] ?? '', $id)) continue;
+            $isbn = null;
+            foreach ($edition['isbn'] ?? [] as $value) { try { $isbn = catalog_isbn($value); break; } catch(InvalidArgumentException $e) {} }
+            $items[] = ['source_id'=>$id[1],'lookup_source'=>'openlibrary','work_id'=>basename($doc['key']),
+                'title'=>$edition['title'] ?? $doc['title'],'author'=>implode(', ', $doc['author_name'] ?? []),
+                'isbn'=>$isbn,'languages'=>catalog_languages($edition['language'] ?? []),
+                'format'=>catalog_text($edition['physical_format'] ?? null),
+                'publisher'=>implode(', ', (array)($edition['publisher'] ?? [])),
+                'published_date'=>implode(', ', (array)($edition['publish_date'] ?? [])),
+                'cover_url'=>!empty($edition['cover_i']) ? 'https://covers.openlibrary.org/b/id/'.(int)$edition['cover_i'].'-M.jpg?default=false' : null];
+        }
+    }
+    $total = (int)($data['numFound'] ?? $data['num_found'] ?? 0);
+    return ['items'=>$items,'next_offset'=>$offset+20 < $total ? $offset+20 : null];
 }

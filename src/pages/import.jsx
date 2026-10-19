@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { BookCover, Empty, PageHeading } from "../components/books";
@@ -13,8 +13,14 @@ import {
   convertProgress,
   catalogSourceInfo,
   mergeEditionResults,
+  rankEditionResults,
+  groupEditionResults,
+  identityConflict,
+  editionLanguageLabel,
 } from "../../catalog.mjs";
 
+const SOURCES = { openlibrary: "Open Library", bnf: "BnF", sudoc: "Sudoc" };
+const DRAFT_KEY = "bookshelf-import-draft-v1";
 const text = (value) =>
   Array.isArray(value) ? value.join(", ") : (value ?? "Non renseigné");
 export function ImportPage({ data, route, navigate, mutate, busy, reload }) {
@@ -33,54 +39,179 @@ export function ImportPage({ data, route, navigate, mutate, busy, reload }) {
   const [message, setMessage] = useState(""),
     [error, setError] = useState(""),
     [pending, setPending] = useState(false);
+  const [sourceStates, setSourceStates] = useState({});
+  const [language, setLanguage] = useState("all");
+  const [confirmedIdentity, setConfirmedIdentity] = useState(false);
+  const [searchContext, setSearchContext] = useState(null);
+  const generation = useRef(0);
+  const [savedDraft, setSavedDraft] = useState(() => {
+    try {
+      return JSON.parse(sessionStorage.getItem(DRAFT_KEY));
+    } catch {
+      return null;
+    }
+  });
+  const [draftActive, setDraftActive] = useState(false);
   const lock = useRef(false);
+  const conflict = candidate && identityConflict(target, candidate);
+  useEffect(() => {
+    if (!draftActive) return;
+    try {
+      sessionStorage.setItem(
+        DRAFT_KEY,
+        JSON.stringify({
+          target,
+          candidate,
+          choices,
+          draft,
+          isbn,
+          title,
+          author,
+          items,
+          next,
+          searchContext,
+        }),
+      );
+    } catch {
+      /* Storage may be unavailable. */
+    }
+  }, [
+    draftActive,
+    target,
+    candidate,
+    choices,
+    draft,
+    isbn,
+    title,
+    author,
+    items,
+    next,
+    searchContext,
+  ]);
+  useEffect(
+    () => () => {
+      generation.current++;
+    },
+    [],
+  );
   const disabled = pending || busy;
   async function lookup(params, book = target, append = false) {
     if (lock.current || busy) return;
+    const requestId = ++generation.current;
     lock.current = true;
     setPending(true);
+    setDraftActive(true);
     setError("");
     setWarnings([]);
-    setMessage("Recherche dans les catalogues…");
-    try {
-      const result = await api.request(
-        "catalog.php?" + new URLSearchParams(params),
-      );
-      setTarget(book);
-      setItems((current) =>
-        append ? mergeEditionResults(current, result.items) : result.items,
-      );
-      setWarnings(result.warnings || []);
-      setNext(
-        result.next ||
-          (result.next_offset != null
-            ? { work: params.work, offset: result.next_offset }
-            : null),
-      );
-      setMessage(
-        result.items.length
-          ? params.editions
-            ? "Éditions et correspondances proposées par Open Library, la BnF et le Sudoc. Vérifie le titre, l’auteur, l’ISBN et le format ; des traductions peuvent apparaître."
-            : "Vérifie l’édition, l’éditeur et la date avant de choisir."
-          : append
-            ? "Aucune nouvelle édition sur cette page. Les éditions déjà chargées restent affichées."
-            : "Aucun résultat. Essaie un autre ISBN ou un titre. L’ajout manuel reste disponible.",
-      );
-    } catch (e) {
-      setError(e.message);
-      setMessage("");
-    } finally {
-      lock.current = false;
-      setPending(false);
+    setTarget(book);
+    if (!append) {
+      setItems([]);
+      setNext(null);
+      setSearchContext(params);
     }
+    setMessage(
+      "Recherche dans les trois catalogues… Les résultats apparaissent au fur et à mesure.",
+    );
+    // Edition expansion retains its independent legacy cursors.
+    if (params.editions || params.work) {
+      try {
+        const result = await api.request(
+          "catalog.php?" + new URLSearchParams(params),
+        );
+        if (requestId !== generation.current) return;
+        setItems((current) =>
+          append ? mergeEditionResults(current, result.items) : result.items,
+        );
+        setWarnings(result.warnings || []);
+        setNext(result.next || null);
+        setMessage(
+          result.items.length
+            ? "Correspondances proposées : vérifie la langue, le format et l’ISBN."
+            : "Aucune nouvelle édition trouvée.",
+        );
+      } catch (e) {
+        if (requestId === generation.current) setError(e.message);
+      } finally {
+        if (requestId === generation.current) {
+          lock.current = false;
+          setPending(false);
+        }
+      }
+      return;
+    }
+    const requests =
+      append && params.requests
+        ? params.requests
+        : Object.keys(SOURCES).map((source) => ({ ...params, source }));
+    const requestedSources = requests.map((q) => q.source);
+    setSourceStates((current) => ({
+      ...(!append ? {} : current),
+      ...Object.fromEntries(
+        requestedSources.map((source) => [source, "recherche en cours"]),
+      ),
+    }));
+    let count = 0,
+      failures = 0;
+    const cursors = append ? { ...(next?.cursors || {}) } : {};
+    await Promise.all(
+      requests.map(async (query) => {
+        try {
+          const result = await api.request(
+            "catalog.php?" + new URLSearchParams(query),
+          );
+          if (requestId !== generation.current) return;
+          count += result.items.length;
+          setItems((current) => mergeEditionResults(current, result.items));
+          setSourceStates((current) => ({
+            ...current,
+            [query.source]: result.items.length
+              ? `${result.items.length} notice(s) reçue(s)`
+              : "aucun résultat",
+          }));
+          if (result.next) cursors[query.source] = result.next;
+          else delete cursors[query.source];
+        } catch (e) {
+          if (requestId !== generation.current) return;
+          failures++;
+          cursors[query.source] = query;
+          setSourceStates((current) => ({
+            ...current,
+            [query.source]: "indisponible",
+          }));
+        }
+      }),
+    );
+    if (requestId !== generation.current) return;
+    const remaining = Object.values(cursors);
+    setNext(remaining.length ? { requests: remaining, cursors } : null);
+    setMessage(
+      count
+        ? "Vérifie la langue, le format et l’ISBN avant de choisir. Les éditions françaises sont prioritaires."
+        : failures
+          ? "Résultats incomplets : relance les catalogues indisponibles."
+          : append
+            ? "Aucune nouvelle notice sur cette page."
+            : "Aucun résultat dans les catalogues consultés. Essaie le titre et l’auteur, élargis la recherche ou complète une fiche manuelle.",
+    );
+    lock.current = false;
+    setPending(false);
   }
   async function select(item, book = target) {
-    if (lock.current || busy) return;
+    if (busy) return;
+    const requestId = ++generation.current;
+    setSourceStates((current) =>
+      Object.fromEntries(
+        Object.entries(current).map(([source, state]) => [
+          source,
+          state === "recherche en cours" ? "recherche interrompue" : state,
+        ]),
+      ),
+    );
     lock.current = true;
     setPending(true);
     setError("");
     try {
-      const full = item.source
+      let full = item.source
         ? item
         : (
             await api.request(
@@ -90,10 +221,19 @@ export function ImportPage({ data, route, navigate, mutate, busy, reload }) {
                 encodeURIComponent(item.source_id),
             )
           ).items[0];
+      if (requestId !== generation.current) return;
       if (!full)
         throw new Error(
           "Cette édition n’a pas de fiche détaillée. Choisis une autre édition.",
         );
+      full = {
+        ...item,
+        ...full,
+        languages: full.languages?.length
+          ? full.languages
+          : item.languages || [],
+        format: full.format || item.format,
+      };
       const latest = book ? data.books.find((b) => b.id === book.id) : null;
       if (book && !latest)
         throw new Error("Ce livre n’existe plus. Recharge la bibliothèque.");
@@ -108,11 +248,17 @@ export function ImportPage({ data, route, navigate, mutate, busy, reload }) {
         : null;
       setTarget(local);
       setCandidate(full);
+      setConfirmedIdentity(false);
+      setDraftActive(true);
       setChoices(
         Object.fromEntries(
           comparisonRows(local || {}, full).map((r) => [
             r.key,
-            r.available && !hasValue(r.current) ? "api" : "local",
+            r.available &&
+            !hasValue(r.current) &&
+            !identityConflict(local, full)
+              ? "api"
+              : "local",
           ]),
         ),
       );
@@ -126,13 +272,22 @@ export function ImportPage({ data, route, navigate, mutate, busy, reload }) {
       );
       navigate("reconciliation");
     } catch (e) {
-      setError(e.message);
+      if (requestId === generation.current) setError(e.message);
     } finally {
-      lock.current = false;
-      setPending(false);
+      if (requestId === generation.current) {
+        lock.current = false;
+        setPending(false);
+      }
     }
   }
   function start(book) {
+    generation.current++;
+    lock.current = false;
+    setPending(false);
+    setDraftActive(true);
+    setSourceStates({});
+    setWarnings([]);
+    setSearchContext(null);
     window.scrollTo({ top: 0, behavior: "smooth" });
     setTarget(book);
     setCandidate(null);
@@ -152,6 +307,7 @@ export function ImportPage({ data, route, navigate, mutate, busy, reload }) {
         book,
       );
   }
+  const editedIsbn = !target && candidate ? draft.isbn : candidate?.isbn;
   const duplicate =
     candidate &&
     data.books.find((book) => {
@@ -164,8 +320,8 @@ export function ImportPage({ data, route, navigate, mutate, busy, reload }) {
       try {
         return (
           book.isbn &&
-          candidate.isbn &&
-          normalizeIsbn(book.isbn) === normalizeIsbn(candidate.isbn)
+          editedIsbn &&
+          normalizeIsbn(book.isbn) === normalizeIsbn(editedIsbn)
         );
       } catch {
         return false;
@@ -173,13 +329,18 @@ export function ImportPage({ data, route, navigate, mutate, busy, reload }) {
     });
   async function save(e) {
     e.preventDefault();
-    if (lock.current || busy || duplicate) return;
+    if (lock.current || busy || duplicate || (conflict && !confirmedIdentity))
+      return;
     lock.current = true;
     setPending(true);
     setError("");
     try {
       let payload;
-      if (target) payload = reconciliationPayload(target, candidate, choices);
+      if (target)
+        payload = {
+          ...reconciliationPayload(target, candidate, choices),
+          confirm_identity: confirmedIdentity,
+        };
       else {
         const values = {
           ...draft,
@@ -201,12 +362,22 @@ export function ImportPage({ data, route, navigate, mutate, busy, reload }) {
           (!Number.isInteger(values.page_count) || values.page_count < 1)
         )
           throw new Error("Le nombre de pages doit être un entier positif.");
-        payload = { candidate, values };
+        payload =
+          candidate.source === "manual"
+            ? { manual: true, values }
+            : { candidate, values };
       }
       await mutate(
         () => api.request("book-import.php", "POST", payload),
-        "Livre enregistré et lié à sa source bibliographique.",
+        candidate.source === "manual"
+          ? "Fiche manuelle enregistrée avec son ISBN."
+          : "Livre enregistré et lié à sa source bibliographique.",
       );
+      setDraftActive(false);
+      setSavedDraft(null);
+      try {
+        sessionStorage.removeItem(DRAFT_KEY);
+      } catch {}
       setCandidate(null);
       setItems([]);
       setTarget(null);
@@ -220,15 +391,39 @@ export function ImportPage({ data, route, navigate, mutate, busy, reload }) {
       setPending(false);
     }
   }
+  function resumeDraft() {
+    const d = savedDraft;
+    if (d.target && !data.books.some((b) => b.id === d.target.id)) {
+      setError("Ce livre n’existe plus.");
+      return;
+    }
+    setTarget(d.target);
+    setCandidate(d.candidate);
+    setChoices(d.choices || {});
+    setDraft(d.draft || {});
+    setIsbn(d.isbn || "");
+    setTitle(d.title || "");
+    setAuthor(d.author || "");
+    setItems(d.items || []);
+    setNext(d.next || null);
+    setSearchContext(d.searchContext);
+    setDraftActive(true);
+    setConfirmedIdentity(false);
+    if (d.candidate) navigate("reconciliation");
+  }
   if (route === "reconciliation") {
     if (!candidate)
       return (
         <>
-          <PageHeading title="Réconciliation" />
+          <PageHeading title="Vérifier les modifications" />
           <Empty
             title="Choisis d’abord une fiche ou un ISBN."
-            action={() => navigate("import")}
-            label="Ouvrir Import Management"
+            action={savedDraft ? resumeDraft : () => navigate("import")}
+            label={
+              savedDraft
+                ? "Reprendre le brouillon"
+                : "Ajouter ou compléter mes livres"
+            }
           />
         </>
       );
@@ -241,7 +436,9 @@ export function ImportPage({ data, route, navigate, mutate, busy, reload }) {
       <>
         <PageHeading
           eyebrow={
-            catalogSourceInfo(candidate.source, candidate.source_id).label
+            candidate.source === "manual"
+              ? "Fiche manuelle"
+              : catalogSourceInfo(candidate.source, candidate.source_id).label
           }
           title={
             target
@@ -250,18 +447,46 @@ export function ImportPage({ data, route, navigate, mutate, busy, reload }) {
           }
           description="Tes notes, tes emprunts et ton historique sont conservés."
         />
-        <p className="mb-6">
-          <a
-            className="underline"
-            href={catalogSourceInfo(candidate.source, candidate.source_id).url}
-            target="_blank"
-            rel="noreferrer"
-          >
-            Voir l’édition dans{" "}
-            {catalogSourceInfo(candidate.source, candidate.source_id).label}
-          </a>
-        </p>
+        {candidate.source !== "manual" && (
+          <p className="mb-6">
+            <a
+              className="underline"
+              href={
+                catalogSourceInfo(candidate.source, candidate.source_id).url
+              }
+              target="_blank"
+              rel="noreferrer"
+            >
+              Voir l’édition dans{" "}
+              {catalogSourceInfo(candidate.source, candidate.source_id).label}
+            </a>
+          </p>
+        )}
         <form className="paper-card import-form" onSubmit={save}>
+          {conflict && (
+            <div className="import-feedback" role="alert">
+              <strong>
+                Cette proposition semble correspondre à une autre œuvre.
+              </strong>
+              <p>
+                Ma fiche : {target.title} — {target.author}. Proposition :{" "}
+                {candidate.title} — {candidate.author}.
+              </p>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={confirmedIdentity}
+                  onChange={(e) => setConfirmedIdentity(e.target.checked)}
+                />{" "}
+                Je confirme vouloir associer ces deux fiches
+              </label>
+            </div>
+          )}
+          <p>
+            {editionLanguageLabel(candidate)} ·{" "}
+            {candidate.format || "Format inconnu"}
+            {candidate.collection ? ` · ${candidate.collection}` : ""}
+          </p>
           {!target ? (
             <>
               <div className="import-preview">
@@ -303,48 +528,91 @@ export function ImportPage({ data, route, navigate, mutate, busy, reload }) {
                 Tes valeurs sont conservées par défaut. Les champs vides peuvent
                 être complétés par l’API.
               </p>
-              {comparisonRows(target, candidate).map((row) => (
-                <fieldset key={row.key} className="reconciliation-field">
-                  <legend>
-                    {row.label}
-                    {row.different && row.available ? " · Différent" : ""}
-                  </legend>
-                  <div className="reconciliation-values">
-                    {[
-                      ["local", "Ma fiche", row.current, target],
-                      [
-                        "api",
-                        catalogSourceInfo(candidate.source, candidate.source_id)
-                          .label,
-                        row.proposed,
-                        candidate,
-                      ],
-                    ].map(([value, label, field, book]) => (
-                      <label key={value} className="reconciliation-value">
-                        <span>
-                          <input
-                            type="radio"
-                            name={"reconcile-" + row.key}
-                            checked={choices[row.key] === value}
-                            disabled={
-                              disabled || (value === "api" && !row.available)
-                            }
-                            onChange={() =>
-                              setChoices({ ...choices, [row.key]: value })
-                            }
-                          />{" "}
-                          {label}
-                        </span>
-                        {row.key === "cover_url" ? (
-                          <BookCover book={book} />
-                        ) : (
-                          <span>{text(field)}</span>
-                        )}
-                      </label>
-                    ))}
-                  </div>
-                </fieldset>
-              ))}
+              <p role="status">
+                {
+                  comparisonRows(target, candidate).filter(
+                    (r) =>
+                      r.available && r.different && choices[r.key] === "api",
+                  ).length
+                }{" "}
+                modification(s) sélectionnée(s). La pagination conserve les
+                valeurs locales par défaut.
+              </p>
+              {comparisonRows(target, candidate)
+                .filter((row) => row.different)
+                .map((row) => (
+                  <fieldset key={row.key} className="reconciliation-field">
+                    <legend>
+                      {row.label}
+                      {row.different && row.available ? " · Différent" : ""}
+                    </legend>
+                    <div className="reconciliation-values">
+                      {[
+                        ["local", "Ma fiche", row.current, target],
+                        [
+                          "api",
+                          catalogSourceInfo(
+                            candidate.source,
+                            candidate.source_id,
+                          ).label,
+                          row.proposed,
+                          candidate,
+                        ],
+                      ].map(([value, label, field, book]) => (
+                        <label key={value} className="reconciliation-value">
+                          <span>
+                            <input
+                              type="radio"
+                              name={"reconcile-" + row.key}
+                              checked={choices[row.key] === value}
+                              disabled={
+                                disabled || (value === "api" && !row.available)
+                              }
+                              onChange={() =>
+                                setChoices({ ...choices, [row.key]: value })
+                              }
+                            />{" "}
+                            {label}
+                          </span>
+                          {row.key === "cover_url" ? (
+                            <BookCover book={book} />
+                          ) : (
+                            <span>{text(field)}</span>
+                          )}
+                        </label>
+                      ))}
+                    </div>
+                  </fieldset>
+                ))}
+              <details>
+                <summary>
+                  Champs identiques (
+                  {
+                    comparisonRows(target, candidate).filter(
+                      (r) => !r.different,
+                    ).length
+                  }
+                  )
+                </summary>
+                {comparisonRows(target, candidate)
+                  .filter((r) => !r.different)
+                  .map((r) => (
+                    <p key={r.key}>
+                      {r.label} : {text(r.current)}
+                    </p>
+                  ))}
+              </details>
+              <p>
+                Changements :{" "}
+                {comparisonRows(target, candidate)
+                  .filter(
+                    (r) =>
+                      r.available && r.different && choices[r.key] === "api",
+                  )
+                  .map((r) => r.label)
+                  .join(", ") || "aucun champ remplacé"}
+                . La source sera liée à la fiche.
+              </p>
             </>
           )}
           {changesPages ? (
@@ -373,7 +641,12 @@ export function ImportPage({ data, route, navigate, mutate, busy, reload }) {
             </p>
           )}
           <div className="flex flex-wrap gap-3">
-            <Button disabled={disabled || !!duplicate} type="submit">
+            <Button
+              disabled={
+                disabled || !!duplicate || (!!conflict && !confirmedIdentity)
+              }
+              type="submit"
+            >
               {pending
                 ? "Enregistrement…"
                 : target
@@ -411,9 +684,26 @@ export function ImportPage({ data, route, navigate, mutate, busy, reload }) {
     <>
       <PageHeading
         eyebrow="ENRICHIR MA BIBLIOTHÈQUE"
-        title="Import Management"
+        title="Ajouter ou compléter mes livres"
         description="Ajoute un livre par ISBN ou associe une fiche manuelle à son édition."
       />
+      {savedDraft && !draftActive && (
+        <div className="paper-card p-4 mb-4">
+          <p>Une recherche ou une comparaison peut être reprise.</p>
+          <Button onClick={resumeDraft}>Reprendre le brouillon</Button>
+          <Button
+            variant="ghost"
+            onClick={() => {
+              setSavedDraft(null);
+              try {
+                sessionStorage.removeItem(DRAFT_KEY);
+              } catch {}
+            }}
+          >
+            Oublier le brouillon
+          </Button>
+        </div>
+      )}
       <div className="flex flex-wrap gap-3 mb-6">
         <Button
           variant="outline"
@@ -454,7 +744,7 @@ export function ImportPage({ data, route, navigate, mutate, busy, reload }) {
           />
           <Button disabled={disabled}>Rechercher par ISBN</Button>
         </form>
-        {target && (
+        {
           <form
             className="import-search"
             onSubmit={(e) => {
@@ -480,8 +770,87 @@ export function ImportPage({ data, route, navigate, mutate, busy, reload }) {
               Rechercher titre / auteur
             </Button>
           </form>
-        )}
+        }
         <p role="status">{message}</p>
+        <ul aria-label="État des catalogues" aria-live="polite">
+          {Object.entries(sourceStates).map(([source, state]) => (
+            <li key={source}>
+              {SOURCES[source]} : {state}
+            </li>
+          ))}
+        </ul>
+        <p>
+          ISBN exact d’abord, puis éditions françaises, langues inconnues et
+          autres langues.
+        </p>
+        <label className="field">
+          <span>Langues des éditions</span>
+          <select
+            value={language}
+            onChange={(e) => setLanguage(e.target.value)}
+          >
+            <option value="all">
+              Toutes les langues · français prioritaire
+            </option>
+            <option value="fr">Français et langue inconnue</option>
+          </select>
+        </label>
+        <div className="flex flex-wrap gap-3 my-4">
+          <Button
+            variant="outline"
+            disabled={disabled || !title.trim()}
+            onClick={() =>
+              lookup({ title: title.split(/[:：]/)[0], author: "" })
+            }
+          >
+            Élargir sans auteur ni sous-titre
+          </Button>
+          {!target && (
+            <Button
+              variant="outline"
+              disabled={disabled}
+              onClick={() => {
+                const manual = {
+                  source: "manual",
+                  title,
+                  author,
+                  isbn,
+                  genres: [],
+                  page_count: null,
+                  publisher: "",
+                  published_date: "",
+                  cover_url: null,
+                };
+                setTarget(null);
+                setCandidate(manual);
+                setConfirmedIdentity(false);
+                setDraftActive(true);
+                setError("");
+                setDraft(
+                  Object.fromEntries(
+                    Object.keys(CATALOG_FIELDS).map((key) => [
+                      key,
+                      Array.isArray(manual[key])
+                        ? manual[key].join(", ")
+                        : (manual[key] ?? ""),
+                    ]),
+                  ),
+                );
+                navigate("reconciliation");
+              }}
+            >
+              Créer une fiche manuelle préremplie
+            </Button>
+          )}
+          <a
+            className="underline"
+            target="_blank"
+            rel="noreferrer"
+            href={`https://www.goodreads.com/search?q=${encodeURIComponent(isbn || [title, author].filter(Boolean).join(" "))}`}
+          >
+            Chercher sur Goodreads
+          </a>
+        </div>
         {warnings.map((warning) => (
           <p role="status" key={warning}>
             {warning}
@@ -492,62 +861,103 @@ export function ImportPage({ data, route, navigate, mutate, busy, reload }) {
             {error}
           </p>
         )}
-        {items.map((item, i) => (
-          <article className="import-result" key={item.source_id + "-" + i}>
-            <BookCover
-              book={{
-                ...item,
-                cover_url:
-                  item.cover_url ||
-                  ((item.source || "openlibrary") === "openlibrary"
-                    ? `https://covers.openlibrary.org/b/olid/${item.source_id}-M.jpg?default=false`
-                    : null),
-              }}
-            />
-            <div>
-              <h3>{item.title}</h3>
-              <p>{item.author}</p>
-              <p className="text-sm text-muted-foreground">
-                {
-                  catalogSourceInfo(
-                    item.source || item.lookup_source || "openlibrary",
-                    item.source_id,
-                  ).label
-                }
-              </p>
+        {groupEditionResults(
+          rankEditionResults(
+            items.filter(
+              (item) =>
+                language === "all" ||
+                !item.languages?.length ||
+                item.languages.includes("fr"),
+            ),
+            searchContext?.isbn,
+          ),
+        ).map((group) => (
+          <div key={group.key} className="my-4">
+            {group.notices.length > 1 && (
               <p>
-                {[
-                  item.publisher,
-                  item.published_date,
-                  item.isbn,
-                  item.source_id,
-                ]
-                  .filter(Boolean)
-                  .join(" · ")}
+                {group.notices.length} notices pour le même ISBN · sources
+                conservées séparément.
               </p>
-              <div className="flex flex-wrap gap-2 mt-3">
-                <Button disabled={disabled} onClick={() => select(item)}>
-                  {target ? "Comparer cette édition" : "Vérifier avant ajout"}
-                </Button>
-                {item.title && !item.edition_result && (
-                  <Button
-                    variant="outline"
-                    disabled={disabled}
-                    onClick={() =>
-                      lookup({
-                        editions: 1,
-                        title: item.title,
-                        author: item.author || "",
-                        ...(item.work_id ? { work: item.work_id } : {}),
-                      })
+            )}
+            {group.conflicts.length > 0 && (
+              <p role="status">
+                Informations contradictoires :{" "}
+                {group.conflicts
+                  .map(
+                    (k) =>
+                      CATALOG_FIELDS[k] ||
+                      { format: "Format", languages: "Langue" }[k],
+                  )
+                  .join(", ")}
+                . Choisis la notice à vérifier ; aucune fusion automatique.
+              </p>
+            )}
+            {group.notices.map((item, i) => (
+              <article className="import-result" key={item.source_id + "-" + i}>
+                <BookCover
+                  book={{
+                    ...item,
+                    cover_url:
+                      item.cover_url ||
+                      ((item.source || "openlibrary") === "openlibrary"
+                        ? `https://covers.openlibrary.org/b/olid/${item.source_id}-M.jpg?default=false`
+                        : null),
+                  }}
+                />
+                <div>
+                  <h3>{item.title}</h3>
+                  <p>{item.author}</p>
+                  <p>
+                    {editionLanguageLabel(item)} ·{" "}
+                    {item.format || "Format inconnu"}
+                    {item.collection ? ` · ${item.collection}` : ""}
+                    {item.page_count ? ` · ${item.page_count} pages` : ""}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    {
+                      catalogSourceInfo(
+                        item.source || item.lookup_source || "openlibrary",
+                        item.source_id,
+                      ).label
                     }
-                  >
-                    Voir les autres éditions
-                  </Button>
-                )}
-              </div>
-            </div>
-          </article>
+                  </p>
+                  <p>
+                    {[
+                      item.publisher,
+                      item.published_date,
+                      item.isbn,
+                      item.source_id,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </p>
+                  <div className="flex flex-wrap gap-2 mt-3">
+                    <Button disabled={busy} onClick={() => select(item)}>
+                      {target
+                        ? "Comparer cette édition"
+                        : "Vérifier avant ajout"}
+                    </Button>
+                    {item.title && (!item.edition_result || item.work_id) && (
+                      <Button
+                        variant="outline"
+                        disabled={disabled}
+                        onClick={() =>
+                          lookup({
+                            editions: 1,
+                            title: item.title,
+                            author: item.author || "",
+                            ...(item.work_id ? { work: item.work_id } : {}),
+                          })
+                        }
+                      >
+                        Voir les autres éditions
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </article>
+            ))}
+          </div>
         ))}
         {next && (
           <Button
@@ -566,7 +976,7 @@ export function ImportPage({ data, route, navigate, mutate, busy, reload }) {
             <span>Afficher</span>
             <select value={filter} onChange={(e) => setFilter(e.target.value)}>
               <option value="manual">Fiches manuelles</option>
-              <option value="linked">Fiches liées à l’API</option>
+              <option value="linked">Fiches avec édition liée</option>
               <option value="all">Toutes les fiches</option>
             </select>
           </label>

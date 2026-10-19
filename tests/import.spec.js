@@ -14,6 +14,252 @@ const candidate = {
   cover_url: "https://covers.openlibrary.org/b/id/123-M.jpg?default=false",
 };
 test.setTimeout(60000);
+
+test("une sélection lente ne remplace pas la dernière édition choisie", async ({
+  page,
+}) => {
+  await setup(page);
+  let release;
+  const slow = new Promise((resolve) => {
+    release = resolve;
+  });
+  await page.route("**/api/catalog.php?**", async (route) => {
+    const params = new URL(route.request().url()).searchParams;
+    if (params.has("source"))
+      return route.fulfill({
+        json: {
+          items:
+            params.get("source") === "openlibrary"
+              ? [
+                  { source_id: "OL1M", title: "Édition A", author: "Auteur A" },
+                  { source_id: "OL2M", title: "Édition B", author: "Auteur B" },
+                ]
+              : [],
+          next: null,
+        },
+      });
+    if (params.get("olid") === "OL1M") {
+      await slow;
+      return route.fulfill({
+        json: {
+          items: [{ ...candidate, source_id: "OL1M", title: "Édition A" }],
+        },
+      });
+    }
+    if (params.get("olid") === "OL2M")
+      return route.fulfill({
+        json: {
+          items: [{ ...candidate, source_id: "OL2M", title: "Édition B" }],
+        },
+      });
+    return route.fallback();
+  });
+  await page.getByLabel("Titre", { exact: true }).fill("Édition");
+  await page.getByRole("button", { name: "Rechercher titre / auteur" }).click();
+  const results = page.getByRole("region", {
+    name: "Recherche bibliographique",
+  });
+  await results
+    .locator(".import-result")
+    .filter({ hasText: "Édition A" })
+    .getByRole("button", { name: "Vérifier avant ajout" })
+    .click();
+  await results
+    .locator(".import-result")
+    .filter({ hasText: "Édition B" })
+    .getByRole("button", { name: "Vérifier avant ajout" })
+    .click();
+  await expect(page.getByLabel("Titre", { exact: true })).toHaveValue(
+    "Édition B",
+  );
+  const completed = page.waitForResponse((r) => r.url().includes("olid=OL1M"));
+  release();
+  await (await completed).finished();
+  // A browser task barrier lets the late response's React update run before inspecting it.
+  await page.evaluate(
+    () =>
+      new Promise((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(resolve)),
+      ),
+  );
+  await expect(page.getByLabel("Titre", { exact: true })).toHaveValue(
+    "Édition B",
+  );
+});
+
+test("l’ISBN modifié dans le brouillon manuel détermine le doublon", async ({
+  page,
+}) => {
+  const state = await setup(page);
+  state.data.books[0].isbn = candidate.isbn;
+  // Reload the library data after the boundary fixture is changed.
+  await page.reload();
+  await page.getByLabel("ISBN-10 ou ISBN-13").fill(candidate.isbn);
+  await page
+    .getByRole("button", { name: "Créer une fiche manuelle préremplie" })
+    .click();
+  await expect(page.getByRole("alert")).toContainText("existe déjà");
+  await page.getByLabel("ISBN", { exact: true }).fill("9782707358158");
+  await expect(page.getByRole("alert")).toHaveCount(0);
+  await expect(
+    page.getByRole("button", {
+      name: "Ajouter à la bibliothèque",
+      exact: true,
+    }),
+  ).toBeEnabled();
+});
+
+test("un ISBN introuvable peut être saisi manuellement puis repris après rechargement", async ({
+  page,
+}) => {
+  const state = await setup(page);
+  await page.getByLabel("ISBN-10 ou ISBN-13").fill("9782707358158");
+  await page
+    .getByRole("button", { name: "Créer une fiche manuelle préremplie" })
+    .click();
+  await page.getByLabel("Titre", { exact: true }).fill("La Clé USB");
+  await page
+    .getByLabel("Auteur", { exact: true })
+    .fill("Jean-Philippe Toussaint");
+  await page.getByLabel("Genres", { exact: true }).fill("Roman");
+  await page.reload();
+  await page.getByRole("button", { name: "Reprendre le brouillon" }).click();
+  await expect(page.getByLabel("ISBN", { exact: true })).toHaveValue(
+    "9782707358158",
+  );
+  await expect(page.getByLabel("Titre", { exact: true })).toHaveValue(
+    "La Clé USB",
+  );
+  await page
+    .getByRole("button", { name: "Ajouter à la bibliothèque", exact: true })
+    .click();
+  await expect(
+    page.getByRole("heading", {
+      name: "Ajouter ou compléter mes livres",
+      exact: true,
+    }),
+  ).toBeVisible();
+  expect(state.writes[0].manual).toBe(true);
+  expect(state.writes[0].values.isbn).toBe("9782707358158");
+});
+
+test("un nouveau livre recherche les trois catalogues et affiche le français en priorité", async ({
+  page,
+}) => {
+  await setup(page);
+  await page.route("**/api/catalog.php?**", async (route) => {
+    const source = new URL(route.request().url()).searchParams.get("source");
+    if (!source) return route.fallback();
+    const records = {
+      openlibrary: {
+        ...candidate,
+        source: "openlibrary",
+        source_id: "OL777M",
+        title: "English edition",
+        languages: ["en"],
+      },
+      bnf: {
+        ...candidate,
+        source: "bnf",
+        source_id: "cb485048536",
+        title: "Édition française",
+        languages: ["fr"],
+      },
+      sudoc: {
+        ...candidate,
+        source: "sudoc",
+        source_id: "292390726",
+        title: "Notice sans langue",
+        languages: [],
+      },
+    };
+    return route.fulfill({
+      json: { items: [{ ...records[source], isbn: null }], next: null, source },
+    });
+  });
+  await page.getByLabel("Titre", { exact: true }).fill("Dune");
+  await page.getByRole("button", { name: "Rechercher titre / auteur" }).click();
+  const results = page.getByRole("region", {
+    name: "Recherche bibliographique",
+  });
+  await expect(results.locator(".import-result")).toHaveCount(3);
+  await expect(results.locator(".import-result").first()).toContainText(
+    "Édition française",
+  );
+  await expect(results).toContainText("Langue inconnue");
+});
+
+test("une panne partielle conserve les réponses reçues et efface les anciens résultats", async ({
+  page,
+}) => {
+  await setup(page);
+  let generation = 0;
+  await page.route("**/api/catalog.php?**", async (route) => {
+    const source = new URL(route.request().url()).searchParams.get("source");
+    if (!source) return route.fallback();
+    if (generation || source === "sudoc")
+      return route.fulfill({
+        status: 502,
+        json: { error: "Catalogue indisponible" },
+      });
+    return route.fulfill({
+      json: {
+        items: [
+          {
+            ...candidate,
+            source,
+            source_id: source === "bnf" ? "cb485048536" : "OL123M",
+          },
+        ],
+        next: null,
+      },
+    });
+  });
+  await page.getByLabel("ISBN-10 ou ISBN-13").fill(candidate.isbn);
+  await page
+    .getByRole("button", { name: "Rechercher par ISBN", exact: true })
+    .click();
+  const results = page.getByRole("region", {
+    name: "Recherche bibliographique",
+  });
+  await expect(results).toContainText("L’Écume API");
+  await expect(results).toContainText("Sudoc : indisponible");
+  generation++;
+  await page
+    .getByRole("button", { name: "Rechercher par ISBN", exact: true })
+    .click();
+  await expect(results.locator(".import-result")).toHaveCount(0);
+  await expect(results).toContainText("Open Library : indisponible");
+});
+
+test("une autre œuvre exige confirmation et ne préselectionne aucun champ distant", async ({
+  page,
+}) => {
+  await setup(page, { provider: "sudoc" });
+  await page
+    .locator(".import-result")
+    .filter({ hasText: "L’Écume des jours" })
+    .getByRole("button")
+    .click();
+  await page.getByLabel("ISBN-10 ou ISBN-13").fill("9791041426027");
+  await page
+    .getByRole("button", { name: "Rechercher par ISBN", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Comparer cette édition" })
+    .first()
+    .click();
+  await expect(page.getByRole("alert")).toContainText("autre œuvre");
+  const save = page.getByRole("button", {
+    name: "Enregistrer mes choix et lier la fiche",
+  });
+  await expect(save).toBeDisabled();
+  await expect(
+    page.locator('input[name="reconcile-isbn"]').first(),
+  ).toBeChecked();
+  await page.getByLabel("Je confirme vouloir associer ces deux fiches").check();
+  await expect(save).toBeEnabled();
+});
 async function setup(
   page,
   { incomplete = false, provider = "openlibrary" } = {},
@@ -140,9 +386,9 @@ async function setup(
           id: 99,
           is_read: false,
           is_wishlist: false,
-          metadata_source: body.candidate.source,
+          metadata_source: body.candidate?.source || null,
           metadata_snapshot: body.candidate,
-          metadata_source_id: body.candidate.source_id,
+          metadata_source_id: body.candidate?.source_id || null,
         });
     } else if (name === "books.php" && req.method() === "POST")
       data.books.push({ ...body, id: 100, is_read: false, is_wishlist: false });
@@ -150,7 +396,10 @@ async function setup(
   });
   await page.goto("/#/import");
   await expect(
-    page.getByRole("heading", { name: "Import Management", exact: true }),
+    page.getByRole("heading", {
+      name: "Ajouter ou compléter mes livres",
+      exact: true,
+    }),
   ).toBeVisible();
   return {
     data,
@@ -210,7 +459,10 @@ for (const width of [390, 1280])
       .getByRole("button", { name: "Enregistrer mes choix et lier la fiche" })
       .click();
     await expect(
-      page.getByRole("heading", { name: "Import Management", exact: true }),
+      page.getByRole("heading", {
+        name: "Ajouter ou compléter mes livres",
+        exact: true,
+      }),
     ).toBeVisible();
     expect(state.writes).toHaveLength(1);
     expect(state.writes[0].choices.title).toBe("local");
@@ -260,7 +512,9 @@ test("ISBN, erreur réseau, nouveau livre et ajout manuel restent disponibles", 
   await page
     .getByRole("button", { name: "Rechercher par ISBN", exact: true })
     .click();
-  await expect(page.getByRole("alert")).toContainText("API indisponible");
+  await expect(
+    page.getByRole("region", { name: "Recherche bibliographique" }),
+  ).toContainText("Résultats incomplets");
   state.failSearch(false);
   await page
     .getByRole("button", { name: "Rechercher par ISBN", exact: true })
@@ -271,7 +525,10 @@ test("ISBN, erreur réseau, nouveau livre et ajout manuel restent disponibles", 
     .getByRole("button", { name: "Ajouter à la bibliothèque", exact: true })
     .click();
   await expect(
-    page.getByRole("heading", { name: "Import Management", exact: true }),
+    page.getByRole("heading", {
+      name: "Ajouter ou compléter mes livres",
+      exact: true,
+    }),
   ).toBeVisible();
   expect(state.writes[0].values.genres).toEqual(["SF", "Aventure"]);
   expect(state.writes[0].candidate.genres).toEqual(["Fiction"]);
@@ -310,7 +567,10 @@ test("une fiche API sans titre reste complétable sans casser les couvertures", 
     .getByRole("button", { name: "Ajouter à la bibliothèque", exact: true })
     .click();
   await expect(
-    page.getByRole("heading", { name: "Import Management", exact: true }),
+    page.getByRole("heading", {
+      name: "Ajouter ou compléter mes livres",
+      exact: true,
+    }),
   ).toBeVisible();
   expect(errors).toEqual([]);
 });
