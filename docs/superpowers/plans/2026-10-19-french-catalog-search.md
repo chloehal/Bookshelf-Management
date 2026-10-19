@@ -44,7 +44,7 @@
 **Files:** `README.md`, tests existants et documentation des limites.
 - [x] Vérifier les ISBN signalés contre les services réels et les parcours mobile/bureau.
 - [x] Exécuter `npm test`, `npm run test:e2e`, `npm run build`, `git diff --check`.
-- [ ] Revue indépendante de la branche, corriger les erreurs matérielles, puis créer et attacher la PR.
+- [x] Revue indépendante de la branche, erreurs matérielles corrigées ; PR #11 créée et attachée.
 
 ## Progress
 - Base : origin/main d22d24f ; 22 tests JS et toutes les suites PHP passent avant modification.
