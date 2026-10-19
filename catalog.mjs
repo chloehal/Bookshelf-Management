@@ -95,3 +95,107 @@ export function mergeEditionResults(current, incoming) {
   }
   return [...records.values()];
 }
+
+export function rankEditionResults(items, requestedIsbn = "") {
+  let isbn;
+  try {
+    isbn = normalizeIsbn(requestedIsbn);
+  } catch {
+    isbn = null;
+  }
+  const score = (item) => {
+    let exact = false;
+    try {
+      exact = !!isbn && normalizeIsbn(item.isbn) === isbn;
+    } catch {
+      /* No usable ISBN. */
+    }
+    const languages = item.languages || [];
+    return (
+      (exact ? 100 : 0) +
+      (languages.includes("fr") ? 20 : languages.length ? 0 : 10)
+    );
+  };
+  return [...items].sort((a, b) => score(b) - score(a));
+}
+
+export function groupEditionResults(items) {
+  const groups = new Map();
+  for (const item of items) {
+    let key = `${item.source || item.lookup_source || "openlibrary"}:${item.source_id}`;
+    try {
+      if (item.isbn) key = normalizeIsbn(item.isbn);
+    } catch {
+      /* Keep unidentifiable notices separate. */
+    }
+    if (!groups.has(key)) groups.set(key, { key, notices: [], conflicts: [] });
+    groups.get(key).notices.push(item);
+  }
+  for (const group of groups.values()) {
+    group.conflicts = [
+      "page_count",
+      "publisher",
+      "published_date",
+      "format",
+      "languages",
+    ].filter(
+      (key) =>
+        new Set(
+          group.notices
+            .filter((n) => hasValue(n[key]))
+            .map((n) => JSON.stringify(n[key])),
+        ).size > 1,
+    );
+  }
+  return [...groups.values()];
+}
+
+const identityTokens = (value) =>
+  String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/œ/g, "oe")
+    .split(/[^a-z0-9]+/)
+    .filter(
+      (w) =>
+        w.length > 1 &&
+        ![
+          "le",
+          "la",
+          "les",
+          "de",
+          "des",
+          "du",
+          "un",
+          "une",
+          "the",
+          "and",
+        ].includes(w),
+    );
+export function identityConflict(local, candidate) {
+  if (!local) return false;
+  return ["title", "author"].some((key) => {
+    const a = identityTokens(local[key]),
+      b = identityTokens(candidate[key]);
+    return a.length > 0 && b.length > 0 && !a.some((word) => b.includes(word));
+  });
+}
+
+export function editionLanguageLabel(item) {
+  const languages = item.languages || [];
+  if (!languages.length) return "Langue inconnue";
+  return languages
+    .map(
+      (code) =>
+        ({
+          fr: "Français",
+          en: "Anglais",
+          de: "Allemand",
+          es: "Espagnol",
+          it: "Italien",
+          nl: "Néerlandais",
+        })[code] || code,
+    )
+    .join(", ");
+}

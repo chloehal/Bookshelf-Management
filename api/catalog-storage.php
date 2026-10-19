@@ -3,7 +3,9 @@ require_once __DIR__ . '/catalog-lib.php';
 class CatalogImportException extends RuntimeException {}
 
 function catalog_import(PDO $pdo, array $data) {
-    $candidate = catalog_validate($data['candidate'] ?? null);
+    $manual = ($data['manual'] ?? false) === true;
+    if ($manual && !empty($data['id'])) throw new InvalidArgumentException('Le mode manuel crée une nouvelle fiche');
+    $candidate = $manual ? array_merge(['source'=>null,'source_id'=>null],catalog_validate_fields($data['values'] ?? null)) : catalog_validate($data['candidate'] ?? null);
     try {
         $pdo->beginTransaction();
         $id = (int) ($data['id'] ?? 0);
@@ -15,13 +17,16 @@ function catalog_import(PDO $pdo, array $data) {
             if (catalog_values($local) !== ($data['expected'] ?? null)) {
                 throw new CatalogImportException('Cette fiche a changé. Ferme la comparaison et relance la recherche pour comparer les dernières valeurs.', 409);
             }
+            if (catalog_identity_conflict($local,$candidate) && ($data['confirm_identity'] ?? false) !== true) {
+                throw new CatalogImportException('Cette proposition semble correspondre à une autre œuvre. Confirme explicitement l’association.',422);
+            }
             $values = catalog_merge($local, $candidate, $data['choices'] ?? []);
         } else {
             $edited = $candidate;
             foreach (CATALOG_FIELDS as $key) {
                 if (array_key_exists($key, $data['values'] ?? [])) $edited[$key] = $data['values'][$key];
             }
-            $values = catalog_values(catalog_validate($edited));
+            $values = catalog_values($manual ? catalog_validate_fields($edited) : catalog_validate($edited));
         }
         if (empty($values['title']) || empty($values['author']) || empty($values['genres'])) {
             throw new InvalidArgumentException('Titre, auteur et au moins un genre requis');
@@ -32,7 +37,7 @@ function catalog_import(PDO $pdo, array $data) {
         foreach ($stmt->fetchAll() as $other) {
             $otherIsbn = null;
             try { if ($other['isbn']) $otherIsbn = catalog_isbn($other['isbn']); } catch (InvalidArgumentException $e) {}
-            if (($other['metadata_source'] === $candidate['source'] && $other['metadata_source_id'] === $candidate['source_id']) || ($candidate['isbn'] && $otherIsbn === $candidate['isbn']) || ($values['isbn'] && $otherIsbn === $values['isbn'])) {
+            if ((!$manual && $other['metadata_source'] === $candidate['source'] && $other['metadata_source_id'] === $candidate['source_id']) || ($candidate['isbn'] && $otherIsbn === $candidate['isbn']) || ($values['isbn'] && $otherIsbn === $values['isbn'])) {
                 throw new CatalogImportException('Cette édition existe déjà : ' . $other['title'], 409);
             }
         }
@@ -67,7 +72,7 @@ function catalog_import(PDO $pdo, array $data) {
         }
         $columns = CATALOG_FIELDS;
         $params = array_map(fn($key) => $key === 'genres' ? json_encode($values[$key], JSON_UNESCAPED_UNICODE) : $values[$key], $columns);
-        array_push($params, $candidate['source'], $candidate['source_id'], json_encode($snapshot, JSON_UNESCAPED_UNICODE));
+        array_push($params, $candidate['source'], $candidate['source_id'], $manual ? null : json_encode($snapshot, JSON_UNESCAPED_UNICODE));
         if ($id) {
             $set = implode(', ', array_map(fn($key) => "$key = ?", $columns));
             $stmt = $pdo->prepare("UPDATE books SET $set, metadata_source = ?, metadata_source_id = ?, metadata_snapshot = ?, metadata_linked_at = CURRENT_TIMESTAMP WHERE id = ?");

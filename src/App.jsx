@@ -162,7 +162,7 @@ export default function App() {
     ["quiz", "Que lire ensuite ?", "Laisser parler tes envies", Shuffle],
     [
       "import",
-      "Import Management",
+      "Ajouter ou compléter mes livres",
       "Ajouter par ISBN et enrichir mes fiches",
       LibraryBig,
     ],

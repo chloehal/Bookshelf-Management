@@ -42,6 +42,15 @@ function catalog_text($value, $limit = 255) {
     if (strlen($value) > $limit * 4) throw new InvalidArgumentException('Texte trop long');
     return $value === '' ? null : mb_substr($value, 0, $limit);
 }
+function catalog_languages($values) {
+    $result = [];
+    foreach ((array)$values as $value) {
+        $code = strtolower(basename(is_array($value) ? ($value['key'] ?? '') : (string)$value));
+        $code = ['fre'=>'fr','fra'=>'fr','eng'=>'en','ger'=>'de','deu'=>'de','spa'=>'es','ita'=>'it','dut'=>'nl','nld'=>'nl'][$code] ?? $code;
+        if (preg_match('/^[a-z]{2,3}$/', $code) && !in_array($code,['und','mul','zxx'],true)) $result[] = $code;
+    }
+    return array_values(array_unique($result));
+}
 function catalog_normalize($book, $olid) {
     $isbns = array_merge($book['identifiers']['isbn_13'] ?? [], $book['identifiers']['isbn_10'] ?? []);
     $isbn = null;
@@ -57,6 +66,8 @@ function catalog_normalize($book, $olid) {
         'publisher' => catalog_text(implode(', ', array_column($book['publishers'] ?? [], 'name'))),
         'cover_url' => catalog_cover_url($book['cover']['large'] ?? $book['cover']['medium'] ?? null),
         'published_date' => catalog_text($book['publish_date'] ?? null, 100),
+        'languages'=>catalog_languages($book['languages'] ?? []),
+        'format'=>catalog_text($book['physical_format'] ?? null),
     ];
 }
 function catalog_values($book) {
@@ -66,10 +77,9 @@ function catalog_values($book) {
     if ($values['page_count'] !== null) $values['page_count'] = (int) $values['page_count'];
     return $values;
 }
-function catalog_validate($candidate) {
-    if (!is_array($candidate) || !is_string($candidate['source'] ?? null) || !is_string($candidate['source_id'] ?? null)) throw new InvalidArgumentException('Source bibliographique invalide');
-    $url = catalog_source_url($candidate['source'], $candidate['source_id']);
-    $result = ['source'=>$candidate['source'], 'source_id'=>$candidate['source_id'], 'source_url'=>$url];
+function catalog_validate_fields($candidate) {
+    if (!is_array($candidate)) throw new InvalidArgumentException('Fiche invalide');
+    $result = [];
     foreach (CATALOG_FIELDS as $key) {
         $value = $candidate[$key] ?? null;
         if ($key === 'genres') {
@@ -85,7 +95,16 @@ function catalog_validate($candidate) {
         } else $value = catalog_text($value, $key === 'published_date' ? 100 : 255);
         $result[$key] = $value;
     }
+    return $result;
+}
+function catalog_validate($candidate) {
+    if (!is_array($candidate) || !is_string($candidate['source'] ?? null) || !is_string($candidate['source_id'] ?? null)) throw new InvalidArgumentException('Source bibliographique invalide');
+    $url = catalog_source_url($candidate['source'], $candidate['source_id']);
+    $result = ['source'=>$candidate['source'], 'source_id'=>$candidate['source_id'], 'source_url'=>$url];
+    $result = array_merge($result,catalog_validate_fields($candidate));
     if (!empty($result['cover_url']) && str_starts_with($result['cover_url'], 'https://openapi.bnf.fr/') && preg_match('/^\d{4}-\d{2}-\d{2}$/', $candidate['cover_retrieved_at'] ?? '')) $result['cover_retrieved_at'] = $candidate['cover_retrieved_at'];
+    $result['languages'] = catalog_languages($candidate['languages'] ?? []);
+    foreach (['format','collection','translator'] as $key) $result[$key] = catalog_text($candidate[$key] ?? null);
     return $result;
 }
 function catalog_merge($local, $candidate, $choices) {
@@ -95,6 +114,18 @@ function catalog_merge($local, $candidate, $choices) {
         if (($choices[$key] ?? 'local') === 'api' && $value !== null && $value !== '' && $value !== []) $values[$key] = $value;
     }
     return $values;
+}
+function catalog_identity_conflict($local, $candidate) {
+    $tokens = function($value) {
+        $value = str_replace('œ','oe',mb_strtolower((string)$value));
+        $value = iconv('UTF-8','ASCII//TRANSLIT//IGNORE',$value);
+        return array_values(array_filter(preg_split('/[^a-z0-9]+/',strtolower($value)),fn($w)=>strlen($w)>1 && !in_array($w,['le','la','les','de','des','du','un','une','the','and'],true)));
+    };
+    foreach (['title','author'] as $key) {
+        $a=$tokens($local[$key] ?? ''); $b=$tokens($candidate[$key] ?? '');
+        if ($a && $b && !array_intersect($a,$b)) return true;
+    }
+    return false;
 }
 function catalog_fetch($path) {
     // Fixed host and no redirects: never fetch a URL supplied by a visitor.
@@ -109,13 +140,21 @@ function catalog_fetch($path) {
     if (!is_array($data)) throw new RuntimeException('Réponse Open Library invalide');
     return $data;
 }
-function catalog_lookup($bibkey) {
-    $data = catalog_fetch('/api/books?' . http_build_query(['bibkeys' => $bibkey, 'format' => 'json', 'jscmd' => 'data']));
+function catalog_lookup($bibkey, $fetch = null) {
+    $fetch ??= 'catalog_fetch';
+    $data = $fetch('/api/books?' . http_build_query(['bibkeys' => $bibkey, 'format' => 'json', 'jscmd' => 'data']));
     if (empty($data[$bibkey])) return null;
     $book = $data[$bibkey];
     preg_match('~/books/(OL\d+M)~', $book['url'] ?? '', $match);
     if (empty($match[1])) throw new RuntimeException('Cette édition ne possède pas de référence utilisable');
-    return catalog_normalize($book, $match[1]);
+    $result = catalog_normalize($book, $match[1]);
+    if (str_starts_with($bibkey,'ISBN:')) $result['isbn'] = catalog_isbn(substr($bibkey,5));
+    try {
+        $edition = $fetch('/books/'.$match[1].'.json');
+        $result['languages'] = catalog_languages($edition['languages'] ?? []);
+        $result['format'] = catalog_text($edition['physical_format'] ?? null);
+    } catch(RuntimeException $e) { /* Optional edition details must not hide an ISBN match. */ }
+    return $result;
 }
 
 // Preserve the reading fraction across editions; no old total means keep the page.

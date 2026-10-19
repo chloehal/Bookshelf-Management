@@ -1,10 +1,12 @@
 <?php
-require_once __DIR__ . '/catalog-editions.php';
+require_once __DIR__ . '/catalog-search.php';
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');
 if ($_SERVER['REQUEST_METHOD'] !== 'GET') { http_response_code(405); echo json_encode(['error' => 'Méthode non autorisée']); exit; }
 try {
-    if (isset($_GET['editions'])) {
+    if (isset($_GET['source'])) {
+        echo json_encode(catalog_search_source($_GET));
+    } elseif (isset($_GET['editions'])) {
         echo json_encode(catalog_editions($_GET));
     } elseif (isset($_GET['sudoc'])) {
         catalog_source_url('sudoc', $_GET['sudoc']);
@@ -41,17 +43,7 @@ try {
         $title = catalog_text($_GET['title'] ?? null);
         $author = catalog_text($_GET['author'] ?? null);
         if (!$title || strlen($title) < 2) throw new InvalidArgumentException('Saisis au moins deux caractères de titre');
-        $params = ['title' => $title, 'lang' => 'fr', 'limit' => 6, 'fields' => 'key,title,author_name,editions,editions.key,editions.title,editions.publisher,editions.publish_date'];
-        if ($author) $params['author'] = $author;
-        $data = catalog_fetch('/search.json?' . http_build_query($params));
-        $items = [];
-        foreach ($data['docs'] ?? [] as $doc) {
-            $edition = $doc['editions']['docs'][0] ?? null;
-            if (!$edition || !preg_match('~/books/(OL\d+M)$~', $edition['key'] ?? '', $match)) continue;
-            $items[] = ['source_id' => $match[1], 'work_id' => basename($doc['key']), 'title' => $edition['title'] ?? $doc['title'], 'author' => implode(', ', $doc['author_name'] ?? []),
-                'publisher' => implode(', ', (array) ($edition['publisher'] ?? [])), 'published_date' => implode(', ', (array) ($edition['publish_date'] ?? []))];
-        }
-        echo json_encode(['items' => $items]);
+        echo json_encode(catalog_editions(['title'=>$title,'author'=>$author]));
     }
 } catch (InvalidArgumentException $e) {
     http_response_code(400); echo json_encode(['error' => $e->getMessage()]);

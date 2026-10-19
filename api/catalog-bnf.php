@@ -49,6 +49,9 @@ function catalog_bnf_parse($xml) {
             $cover = 'https://openapi.bnf.fr/couverture/image/image/recupererImage?' . http_build_query(['idArk'=>'ark:/12148/' . $id, 'couverture'=>1]);
         }
         $items[] = [
+            'languages'=>catalog_languages($fields('101','a')),
+            'format'=>$fields('010','b')[0] ?? null,
+            'collection'=>$fields('225','a')[0] ?? null,
             'source'=>'bnf', 'source_id'=>$id, 'source_url'=>catalog_source_url('bnf',$id),
             'title'=>$fields('200','a')[0] ?? null,
             'author'=>catalog_text(implode(', ', array_unique($authors)) ?: ($fields('200','f')[0] ?? null)),

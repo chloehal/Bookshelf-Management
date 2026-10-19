@@ -45,6 +45,9 @@ function catalog_sudoc_parse($xml) {
         if (preg_match('/\b(\d+)\s*(?:p\.|pages?\b)/u', $value, $match)) { $pages = (int)$match[1]; break; }
     }
     return ['source'=>'sudoc','source_id'=>$id,'source_url'=>$url,
+        'languages'=>catalog_languages($values('101','a')),
+        'format'=>$values('010','b')[0] ?? null,
+        'collection'=>$values('225','a')[0] ?? null,
         'title'=>$values('200','a')[0] ?? null,
         'author'=>catalog_text(implode(', ', array_unique($authors)) ?: ($values('200','f')[0] ?? null)),
         'isbn'=>$isbns[0] ?? null,'isbns'=>array_values(array_unique($isbns)),

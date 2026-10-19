@@ -142,7 +142,7 @@ Le déploiement Hostinger reste celui décrit plus haut. Un push sur `main` déc
 ## Import de livres et migration d’une installation existante
 
 L’ajout manuel reste disponible dans « Tous mes livres », sous l’ajout par ISBN.
-Les recherches passent par `api/catalog.php` vers [Open Library](https://openlibrary.org/dev/docs/api/books).
+Les recherches passent par `api/catalog.php` vers Open Library, la BnF et le Sudoc. Le client lance les trois recherches immédiatement et affiche chaque réponse sans attendre les autres.
 PHP doit disposer de cURL et mbstring ; aucune clé API n’est nécessaire.
 
 Avant de mettre le nouveau frontend en service, sauvegarder la base, déposer les
@@ -154,13 +154,13 @@ date de publication et provenance, ainsi que les contraintes d’unicité des é
 Les anciennes fiches restent manuelles jusqu’à leur rapprochement. Pour une
 nouvelle base, `schema.sql` contient déjà ces colonnes.
 
-« Import Management » permet de sélectionner une fiche, rechercher une édition,
+« Ajouter ou compléter mes livres » permet de sélectionner une fiche, rechercher une édition,
 puis ouvrir « Réconciliation ». Les valeurs locales existantes sont sélectionnées
 par défaut ; une valeur API absente n’efface jamais la fiche. La validation met à
 jour uniquement les champs bibliographiques. L’année d’acquisition, les notes,
 la lecture, les cadeaux, la wishlist, les couleurs/tailles et les emprunts restent
 inchangés. Une fiche liée peut être comparée à nouveau depuis le filtre « Fiches
-liées à l’API ». La source et son dernier instantané sont conservés en base.
+avec édition liée ». La source et son dernier instantané sont conservés en base.
 
 L’association est explicite : une recherche titre/auteur peut proposer une autre
 édition ou une autre langue. Vérifier l’éditeur, la date et la couverture ; l’ISBN
@@ -272,13 +272,12 @@ puis le choix de la couverture API dans la réconciliation.
 BnF et Sudoc. Le bouton recherche dans la liste des éditions de
 l’œuvre Open Library et dans les recherches titre/auteur BnF et Sudoc. Si aucun
 identifiant d’œuvre Open Library n’est disponible, sa recherche titre/auteur sert
-à trouver une œuvre correspondante. Il s’agit de correspondances à vérifier :
+à explorer plusieurs œuvres candidates, avec pagination et préférence de langue française. Il s’agit de correspondances à vérifier :
 les traductions et les titres proches peuvent apparaître et aucun catalogue ne
 garantit l’exhaustivité de toutes les éditions publiées.
 
 Chaque résultat affiche sa source, son ISBN, son éditeur et sa date si disponibles.
-Les notices de deux sources pour un même ISBN restent distinctes pour pouvoir
-comparer leurs métadonnées. « Charger les éditions suivantes » conserve les
+Les notices de plusieurs sources pour un même ISBN normalisé sont regroupées ; chaque notice reste sélectionnable et les conflits de métadonnées sont signalés. « Charger les éditions suivantes » conserve les
 résultats déjà affichés, suit séparément chaque catalogue et évite de répéter une
 même notice. Les pages SRU respectent `nextRecordPosition` ou le nombre de notices
 réellement reçu. Une source indisponible est signalée, les autres restent utilisables
@@ -288,3 +287,53 @@ Tests hors réseau : `php tests/editions-test.php`. Contrôle réel en lecture s
 `php tests/editions-live.php`.
 
 Goodreads n’est pas intégré : [son API publique ne délivre plus de nouvelles clés](https://www.goodreads.com/topic/show/21788520-api-deprecation).
+
+
+### Recherche française et parcours de secours
+
+Le formulaire titre/auteur est disponible dès le départ, pour un nouvel ajout comme
+pour une fiche existante. Chaque recherche ISBN ou titre/auteur appelle les trois
+catalogues via `catalog.php?source=openlibrary|bnf|sudoc`. Les états de réponse sont
+affichés séparément ; une panne ne masque pas les autres notices. Les pages suivantes
+conservent les résultats et les curseurs indépendants des catalogues.
+
+Le classement privilégie l’ISBN exact demandé, puis la langue française déclarée
+pour l’édition, puis les langues inconnues et enfin les autres langues. Le filtre
+« Français et langue inconnue » garde les notices non documentées. La langue n’est
+jamais déduite du préfixe ISBN ou de l’origine du catalogue. La langue, le format et
+la collection sont affichés lorsqu’ils existent, et conservés dans le snapshot JSON
+de la source : aucune nouvelle migration SQL n’est nécessaire. Le paramètre
+[`lang=fr` d’Open Library](https://openlibrary.org/dev/docs/api/search) favorise le
+français sans exclure les autres langues ; les éditions absentes d’une page ne
+peuvent pas être classées avant d’avoir été chargées.
+
+En cas d’absence, la recherche peut être élargie sans auteur ni sous-titre, un lien
+ouvre la recherche Goodreads, et une fiche manuelle peut être créée dans le même
+parcours en conservant l’ISBN et les champs saisis. Cet ajout utilise la même
+validation et la même protection contre les doublons ISBN ; il ne crée aucune
+provenance de catalogue fictive. Goodreads ne fournit pas de nouvel accès API
+officiel dans cette intégration. La couverture des trois catalogues reste limitée,
+notamment pour certaines éditions françaises récentes.
+
+La comparaison signale un titre ou auteur sans correspondance significative et
+exige une confirmation explicite, également vérifiée par le serveur. Cette alerte
+est heuristique, pas une preuve automatique d’identité. Les valeurs locales sont
+conservées par défaut, les champs vides ne sont pas préremplis en cas de divergence,
+les champs identiques sont repliés et un résumé décrit les changements sélectionnés.
+Les conflits de pagination entre notices restent visibles ; le choix du total et
+la conversion proportionnelle de progression restent explicites. Les sujets de
+catalogue ne remplacent pas automatiquement des genres personnels existants.
+
+Un brouillon de recherche/comparaison est conservé dans `sessionStorage` pour
+reprendre après rechargement du même onglet. Le brouillon n’est pas partagé entre
+appareils ; son existence dépend du stockage disponible dans le navigateur. Une
+confirmation d’identité doit être donnée à nouveau après reprise ; les contrôles
+409 continuent de refuser l’écrasement d’une fiche modifiée entre-temps.
+
+Vérifications réelles en lecture seule du 19 octobre 2026 : le titre « Les passeurs
+de livres de Daraya » / Delphine Minoui trouve 1 notice Open Library, 6 BnF et 5 Sudoc.
+L’ISBN `9791041426027` est trouvé au Sudoc (notice 292390726, français, 177 pages) ;
+`9782707358158` reste absent des trois sources lors de ce contrôle et peut être
+conservé dans le parcours manuel. Ces cas ne constituent pas une mesure exhaustive
+de couverture. Les tests navigateur utilisent une bibliothèque isolée et ne
+modifient jamais les données de production.

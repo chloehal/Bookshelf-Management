@@ -71,7 +71,7 @@ export function LibraryPage({
             Ajouter par ISBN
           </Button>
           <Button variant="ghost" onClick={() => navigate("import")}>
-            Import Management
+            Ajouter ou compléter mes livres
           </Button>
         </div>
       )}

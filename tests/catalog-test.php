@@ -50,7 +50,7 @@ $db->exec("INSERT INTO currently_reading VALUES (1, 2, 100, '2026-10-01')");
 $db->exec("INSERT INTO reading_log VALUES (1, 2, 100, '2026-10-02')");
 $activeCandidate = $new; $activeCandidate['page_count'] = 824;
 $activeLocal = $db->query('SELECT * FROM books WHERE id = 2')->fetch();
-$activePayload = ['id' => 2, 'candidate' => $activeCandidate, 'expected' => catalog_values($activeLocal), 'choices' => ['page_count' => 'api']];
+$activePayload = ['confirm_identity'=>true, 'id' => 2, 'candidate' => $activeCandidate, 'expected' => catalog_values($activeLocal), 'choices' => ['page_count' => 'api']];
 catalog_import($db, $activePayload);
 check((int) $db->query('SELECT current_page FROM currently_reading WHERE book_id = 2')->fetchColumn() === 200, 'Automatic percentage: 100/412 becomes 200/824');
 check((int) $db->query('SELECT SUM(pages_read) FROM reading_log')->fetchColumn() === 100, 'Conversion creates no reading activity');
@@ -88,7 +88,7 @@ echo "BnF persistence tests passed\n";
 $otherSource = $candidate; $otherSource['source_id'] = 'OL999M'; $otherSource['isbn'] = $bnf['isbn'];
 $otherSource['cover_url'] = 'https://covers.openlibrary.org/b/id/1-M.jpg?default=false';
 $keepBnf = $db->query('SELECT * FROM books WHERE id = ' . (int) $bnfId)->fetch();
-catalog_import($db, ['id'=>$bnfId, 'candidate'=>$otherSource, 'expected'=>catalog_values($keepBnf), 'choices'=>['title'=>'api']]);
+catalog_import($db, ['confirm_identity'=>true, 'id'=>$bnfId, 'candidate'=>$otherSource, 'expected'=>catalog_values($keepBnf), 'choices'=>['title'=>'api']]);
 $keptSnapshot = json_decode($db->query('SELECT metadata_snapshot FROM books WHERE id = ' . (int) $bnfId)->fetchColumn(),true);
 check(($keptSnapshot['cover_provenance']['retrieved_at'] ?? null) === $bnf['cover_retrieved_at'], 'Retaining a local BnF cover also retains its retrieval date when provider changes');
 
@@ -107,3 +107,17 @@ check($savedSudoc['rating'] === 4 && $savedSudoc['year'] === 2025, 'Sudoc preser
 check((int)$db->query('SELECT current_page FROM currently_reading WHERE book_id = '.$sudocId)->fetchColumn() === 89, 'Sudoc pagination converts reading position 96/192 to 89/177');
 check((int)$db->query('SELECT pages_read FROM reading_log WHERE id = 10')->fetchColumn() === 96, 'Sudoc conversion preserves reading history');
 echo "Sudoc persistence and reading reconciliation tests passed\n";
+
+$identityLocal = $db->query('SELECT * FROM books WHERE id = 1')->fetch();
+$identityCandidate = $sudoc;
+$identityPayload = ['id'=>1,'candidate'=>$identityCandidate,'expected'=>catalog_values($identityLocal),'choices'=>[]];
+try { catalog_import($db,$identityPayload); throw new Exception('Different work linked without confirmation'); }
+catch (CatalogImportException $e) { check($e->getCode() === 422, 'Identity mismatch requires explicit confirmation'); }
+check($db->query('SELECT metadata_source_id FROM books WHERE id = 1')->fetchColumn() === $identityLocal['metadata_source_id'], 'Mismatch rolls back without changing provenance');
+echo "Identity guard tests passed\n";
+$manual = catalog_import($db,['manual'=>true,'values'=>['title'=>'La Clé USB','author'=>'Jean-Philippe Toussaint','genres'=>['Roman'],'isbn'=>'9782707358158','page_count'=>192,'publisher'=>'Minuit','published_date'=>'2026']]);
+$savedManual = $db->query('SELECT * FROM books WHERE id = '.(int)$manual['id'])->fetch();
+check($savedManual['isbn'] === '9782707358158' && $savedManual['publisher'] === 'Minuit' && $savedManual['metadata_source'] === null, 'Manual fallback keeps ISBN without inventing catalogue provenance');
+try { catalog_import($db,['manual'=>true,'values'=>['title'=>'Doublon','author'=>'Auteur','genres'=>['Roman'],'isbn'=>'9782707358158']]); throw new Exception('Duplicate manual ISBN accepted'); }
+catch(CatalogImportException $e) { check($e->getCode() === 409,'Manual ISBN duplicate guard'); }
+echo "Manual ISBN fallback tests passed\n";
