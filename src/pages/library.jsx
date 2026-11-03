@@ -26,7 +26,7 @@ import {
   PageHeading,
 } from "../components/books";
 import { Choice } from "../components/forms";
-import { filterBooks, dateLabel } from "../lib/library";
+import { filterBooks, dateLabel, formatAudioDuration } from "../lib/library";
 import { api } from "../lib/api";
 export function LibraryPage({
   data,
@@ -47,6 +47,8 @@ export function LibraryPage({
     current: data.current,
     loans: data.loans,
   });
+  const audioView = !wishlist && filters.status === "audio";
+  const shelfView = !audioView && filters.view === "shelf";
   const set = (key, value) => setFilters({ ...filters, [key]: value });
   return (
     <>
@@ -114,6 +116,7 @@ export function LibraryPage({
                 ["loaned", "Prêtés"],
                 ["gift", "Cadeaux"],
                 ["rated", "Notés"],
+                ["audio", "Disponible en audio"],
               ]
           ).map(([key, label]) => (
             <button
@@ -125,28 +128,30 @@ export function LibraryPage({
             </button>
           ))}
         </div>
-        <div
-          className="view-switch"
-          role="group"
-          aria-label="Affichage du catalogue"
-        >
-          <button
-            aria-label="Vue cartes"
-            aria-pressed={filters.view !== "shelf"}
-            onClick={() => set("view", "grid")}
+        {!audioView && (
+          <div
+            className="view-switch"
+            role="group"
+            aria-label="Affichage du catalogue"
           >
-            <LayoutGrid size={17} />
-            <span>Cartes</span>
-          </button>
-          <button
-            aria-label="Vue étagère"
-            aria-pressed={filters.view === "shelf"}
-            onClick={() => set("view", "shelf")}
-          >
-            <LibraryBig size={18} />
-            <span>Étagère</span>
-          </button>
-        </div>
+            <button
+              aria-label="Vue cartes"
+              aria-pressed={filters.view !== "shelf"}
+              onClick={() => set("view", "grid")}
+            >
+              <LayoutGrid size={17} />
+              <span>Cartes</span>
+            </button>
+            <button
+              aria-label="Vue étagère"
+              aria-pressed={filters.view === "shelf"}
+              onClick={() => set("view", "shelf")}
+            >
+              <LibraryBig size={18} />
+              <span>Étagère</span>
+            </button>
+          </div>
+        )}
       </div>
       {expanded && (
         <div className="filter-panel">
@@ -200,7 +205,7 @@ export function LibraryPage({
           {books.length} livre{books.length !== 1 ? "s" : ""}
         </span>
         <span>
-          {filters.view === "shelf" ? "Sur les étagères" : "Entre les pages"}
+          {shelfView ? "Sur les étagères" : "Entre les pages"}
         </span>
       </div>
       {!books.length ? (
@@ -221,7 +226,7 @@ export function LibraryPage({
             ? "Essaie un autre titre ou ajuste les filtres."
             : "Ajoute ton premier livre à la collection."}
         </Empty>
-      ) : filters.view === "shelf" ? (
+      ) : shelfView ? (
         <Bookshelf books={books} openBook={openBook} />
       ) : (
         <div className="book-grid">
@@ -320,8 +325,7 @@ export function BookPage({ id, data, openModal, run, busy, navigate }) {
               <div>
                 <dt>Livre audio</dt>
                 <dd>
-                  {Math.floor(book.audio_duration_minutes / 60)} h{" "}
-                  {String(book.audio_duration_minutes % 60).padStart(2, "0")} min
+                  {formatAudioDuration(book.audio_duration_minutes)}
                 </dd>
               </div>
             )}

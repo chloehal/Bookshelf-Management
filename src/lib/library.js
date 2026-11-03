@@ -34,6 +34,7 @@ export function filterBooks(
         status === "all" ||
         (status === "read" && b.is_read) ||
         (status === "gift" && b.is_gift) ||
+        (status === "audio" && b.audio_duration_minutes > 0) ||
         (status === "rated" && b.rating > 0) ||
         (status === "unread" && !b.is_read) ||
         (status === "current" && currentIds.has(b.id)) ||
@@ -165,4 +166,10 @@ export function coverForeground(book) {
     .map((c) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
   const luminance = 0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2];
   return luminance > 0.179 ? "#171610" : "#ffffff";
+}
+
+export function formatAudioDuration(minutes) {
+  const hours = Math.floor(minutes / 60);
+  const remainder = minutes % 60;
+  return hours ? `${hours} h ${String(remainder).padStart(2, "0")} min` : `${remainder} min`;
 }
