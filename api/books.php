@@ -3,9 +3,9 @@ require_once __DIR__ . '/config.php';
 
 function bookAudioDuration(array $data): ?int {
     $duration = $data['audio_duration_minutes'] ?? null;
-    if ($duration !== null && (!is_int($duration) || $duration < 1 || $duration > 4294967295)) {
+    if ($duration !== null && (!is_int($duration) || $duration < 0 || $duration > 4294967295)) {
         http_response_code(400);
-        echo json_encode(['error' => 'La durée audio doit être un nombre entier positif de minutes.']);
+        echo json_encode(['error' => 'La durée audio doit être un nombre entier de minutes supérieur ou égal à zéro.']);
         exit;
     }
     return $duration;

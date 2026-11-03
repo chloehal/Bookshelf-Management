@@ -10,7 +10,6 @@ import {
 } from "lucide-react";
 import { Card, CardContent } from "./ui/card";
 import { Button } from "./ui/button";
-import { Input } from "./ui/input";
 import { Badge } from "./ui/badge";
 import { Progress } from "./ui/progress";
 import {
@@ -99,86 +98,6 @@ export function Rating({ value = 0, onChange, disabled = false }) {
     </div>
   );
 }
-function CardAudioForm({ duration, onSave, busy }) {
-  const [checked, setChecked] = useState(duration > 0);
-  const [hours, setHours] = useState(Math.floor(duration / 60));
-  const [minutes, setMinutes] = useState(duration % 60);
-  const [error, setError] = useState("");
-  const nextDuration = checked ? Number(hours) * 60 + Number(minutes) : null;
-
-  async function submit(event) {
-    event.preventDefault();
-    setError("");
-    if (
-      checked &&
-      (!Number.isInteger(nextDuration) ||
-        nextDuration < 1 ||
-        nextDuration > 4294967295)
-    ) {
-      setError("Indique une durée audio d’au moins une minute.");
-      return;
-    }
-    try {
-      await onSave(nextDuration);
-    } catch (e) {
-      setError(e.message);
-    }
-  }
-
-  return (
-    <form onSubmit={submit} className="border-t p-3">
-      <fieldset disabled={busy} className="grid gap-2">
-        <label className="flex items-center gap-2 text-sm">
-          <input
-            type="checkbox"
-            checked={checked}
-            onChange={(e) => {
-              setChecked(e.target.checked);
-              setError("");
-            }}
-          />
-          Disponible en audio
-        </label>
-        {checked && (
-          <div className="grid grid-cols-2 gap-2">
-            <label className="field">
-              <span>Heures</span>
-              <Input
-                type="number"
-                min="0"
-                step="1"
-                value={hours}
-                onChange={(e) => setHours(e.target.value)}
-              />
-            </label>
-            <label className="field">
-              <span>Minutes</span>
-              <Input
-                type="number"
-                min="0"
-                max="59"
-                step="1"
-                value={minutes}
-                onChange={(e) => setMinutes(e.target.value)}
-              />
-            </label>
-          </div>
-        )}
-        {nextDuration !== (duration || null) && (
-          <Button type="submit" size="sm" variant="outline">
-            Enregistrer l’audio
-          </Button>
-        )}
-        {error && (
-          <p role="alert" className="text-sm text-destructive">
-            {error}
-          </p>
-        )}
-      </fieldset>
-    </form>
-  );
-}
-
 export function BookCard({ book, onOpen, current, loan, onSaveAudio, busy }) {
   return (
     <Card className="gap-0 overflow-hidden py-0">
@@ -200,7 +119,7 @@ export function BookCard({ book, onOpen, current, loan, onSaveAudio, busy }) {
           <h3>{book.title}</h3>
           <p>{book.author}</p>
           {book.audio_duration_minutes > 0 && (
-            <span className="small-label">
+            <span className="inline-flex rounded-full border px-2 py-0.5 text-xs">
               Audio · {formatAudioDuration(book.audio_duration_minutes)}
             </span>
           )}
@@ -222,12 +141,15 @@ export function BookCard({ book, onOpen, current, loan, onSaveAudio, busy }) {
         </div>
       </button>
       {onSaveAudio && (
-        <CardAudioForm
-          key={book.audio_duration_minutes ?? 0}
-          duration={book.audio_duration_minutes ?? 0}
-          onSave={onSaveAudio}
-          busy={busy}
-        />
+        <label className="flex items-center gap-2 border-t p-3 text-sm">
+          <input
+            type="checkbox"
+            checked={book.audio_duration_minutes != null}
+            disabled={busy}
+            onChange={(event) => onSaveAudio(event.target.checked ? 0 : null)}
+          />
+          Disponible en audio
+        </label>
       )}
     </Card>
   );

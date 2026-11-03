@@ -36,7 +36,7 @@ export function LibraryPage({
   setFilters,
   wishlist = false,
   navigate,
-  mutate,
+  run,
   busy,
 }) {
   const [expanded, setExpanded] = useState(false);
@@ -239,13 +239,13 @@ export function LibraryPage({
               onSaveAudio={
                 !wishlist && !b.is_read
                   ? (duration) =>
-                      mutate(
+                      run(
                         () =>
                           api.saveBook(
                             { audio_duration_minutes: duration },
                             b.id,
                           ),
-                        "Durée audio enregistrée.",
+                        "Disponibilité audio enregistrée.",
                       )
                   : undefined
               }
