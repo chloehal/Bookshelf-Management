@@ -2,6 +2,7 @@
 require_once __DIR__ . '/config.php';
 
 $migrations = [
+    "ALTER TABLE books ADD COLUMN audio_duration_minutes INT UNSIGNED DEFAULT NULL",
     "ALTER TABLE books ADD COLUMN cover_url VARCHAR(255) DEFAULT NULL",
     "ALTER TABLE books ADD COLUMN isbn VARCHAR(13) DEFAULT NULL",
     "ALTER TABLE books ADD COLUMN publisher VARCHAR(255) DEFAULT NULL",
