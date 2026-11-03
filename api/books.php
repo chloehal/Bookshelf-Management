@@ -1,11 +1,21 @@
 <?php
 require_once __DIR__ . '/config.php';
 
+function bookAudioDuration(array $data): ?int {
+    $duration = $data['audio_duration_minutes'] ?? null;
+    if ($duration !== null && (!is_int($duration) || $duration < 1 || $duration > 4294967295)) {
+        http_response_code(400);
+        echo json_encode(['error' => 'La durée audio doit être un nombre entier positif de minutes.']);
+        exit;
+    }
+    return $duration;
+}
+
 $method = $_SERVER['REQUEST_METHOD'];
 
 switch ($method) {
     case 'GET':
-        $stmt = $pdo->query('SELECT id, title, author, genres, is_read, year, is_gift, is_wishlist, rating, page_count, color, size, isbn, publisher, published_date, cover_url, metadata_source, metadata_source_id, metadata_snapshot, metadata_linked_at, (SELECT cr.id FROM currently_reading cr WHERE cr.book_id = books.id) AS reading_id, (SELECT CASE WHEN books.metadata_source IS NULL THEN COALESCE((SELECT SUM(rl.pages_read) FROM reading_log rl WHERE rl.book_id = books.id), 0) ELSE cr.current_page END FROM currently_reading cr WHERE cr.book_id = books.id) AS current_page FROM books ORDER BY title ASC');
+        $stmt = $pdo->query('SELECT id, title, author, genres, is_read, year, is_gift, is_wishlist, rating, audio_duration_minutes, page_count, color, size, isbn, publisher, published_date, cover_url, metadata_source, metadata_source_id, metadata_snapshot, metadata_linked_at, (SELECT cr.id FROM currently_reading cr WHERE cr.book_id = books.id) AS reading_id, (SELECT CASE WHEN books.metadata_source IS NULL THEN COALESCE((SELECT SUM(rl.pages_read) FROM reading_log rl WHERE rl.book_id = books.id), 0) ELSE cr.current_page END FROM currently_reading cr WHERE cr.book_id = books.id) AS current_page FROM books ORDER BY title ASC');
         $books = $stmt->fetchAll();
         foreach ($books as &$book) {
             $book['id'] = (int) $book['id'];
@@ -17,6 +27,7 @@ switch ($method) {
             $book['rating'] = $book['rating'] ? (int) $book['rating'] : null;
             $book['year'] = $book['year'] ? (int) $book['year'] : null;
             $book['page_count'] = $book['page_count'] ? (int) $book['page_count'] : null;
+            $book['audio_duration_minutes'] = $book['audio_duration_minutes'] === null ? null : (int) $book['audio_duration_minutes'];
             $book['size'] = $book['size'] ? (int) $book['size'] : null;
             $book['genres'] = json_decode($book['genres']);
             $book['metadata_snapshot'] = $book['metadata_snapshot'] ? json_decode($book['metadata_snapshot'], true) : null;
@@ -43,8 +54,8 @@ switch ($method) {
         $size = !empty($data['size']) ? (int) $data['size'] : null;
         $color = !empty($data['color']) ? $data['color'] : null;
 
-        $stmt = $pdo->prepare('INSERT INTO books (title, author, genres, year, is_gift, is_wishlist, page_count, size, color) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)');
-        $stmt->execute([$title, $author, json_encode($genres), $year, $is_gift, $is_wishlist, $page_count, $size, $color]);
+        $stmt = $pdo->prepare('INSERT INTO books (title, author, genres, year, is_gift, is_wishlist, page_count, size, color, audio_duration_minutes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
+        $stmt->execute([$title, $author, json_encode($genres), $year, $is_gift, $is_wishlist, $page_count, $size, $color, bookAudioDuration($data)]);
 
         echo json_encode(['id' => (int) $pdo->lastInsertId(), 'success' => true]);
         break;
@@ -73,6 +84,11 @@ switch ($method) {
                     $values[] = $data[$field];
                 }
             }
+        }
+
+        if (array_key_exists('audio_duration_minutes', $data)) {
+            $fields[] = 'audio_duration_minutes = ?';
+            $values[] = bookAudioDuration($data);
         }
 
         if (empty($fields)) {

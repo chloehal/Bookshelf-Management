@@ -316,6 +316,15 @@ export function BookPage({ id, data, openModal, run, busy, navigate }) {
               <dt>Pages</dt>
               <dd>{book.page_count || "Non renseigné"}</dd>
             </div>
+            {book.audio_duration_minutes > 0 && (
+              <div>
+                <dt>Livre audio</dt>
+                <dd>
+                  {Math.floor(book.audio_duration_minutes / 60)} h{" "}
+                  {String(book.audio_duration_minutes % 60).padStart(2, "0")} min
+                </dd>
+              </div>
+            )}
             <div>
               <dt>Acquisition</dt>
               <dd>

@@ -56,6 +56,10 @@ export function FormModal({ modal, onClose, data, mutate }) {
     color: book?.color || "",
     is_gift: book?.is_gift || false,
   });
+  const [hasAudio, setHasAudio] = useState(Boolean(book?.audio_duration_minutes));
+  const [audioHours, setAudioHours] = useState(Math.floor((book?.audio_duration_minutes ?? 0) / 60));
+  const [audioMinutes, setAudioMinutes] = useState((book?.audio_duration_minutes ?? 0) % 60);
+  const canEditAudio = !book?.is_read && !(book?.is_wishlist || modal.wishlist);
   const [error, setError] = useState(""),
     [saving, setSaving] = useState(false),
     [value, setValue] = useState(current?.current_page ?? ""),
@@ -83,6 +87,13 @@ export function FormModal({ modal, onClose, data, mutate }) {
       let operation;
       if (modal.type === "add" || modal.type === "edit") {
         const payload = bookPayload(form);
+        if (canEditAudio) {
+          const duration = Number(audioHours) * 60 + Number(audioMinutes);
+          if (hasAudio && (!Number.isInteger(duration) || duration < 1 || duration > 4294967295)) {
+            throw new Error("Indique une durée audio d’au moins une minute.");
+          }
+          payload.audio_duration_minutes = hasAudio ? duration : null;
+        }
         if (modal.type === "add") payload.is_wishlist = !!modal.wishlist;
         operation = () =>
           api.saveBook(payload, modal.type === "edit" ? book.id : undefined);
@@ -185,6 +196,41 @@ export function FormModal({ modal, onClose, data, mutate }) {
               <p className="field-hint">
                 Jusqu’à 3 genres, séparés par des virgules.
               </p>
+              {canEditAudio && (
+                <>
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={hasAudio}
+                      onChange={(e) => setHasAudio(e.target.checked)}
+                    />
+                    Disponible en audio
+                  </label>
+                  {hasAudio && (
+                    <div className="form-grid">
+                      <Field
+                        id="book-audio-hours"
+                        label="Durée audio (heures)"
+                        type="number"
+                        min="0"
+                        step="1"
+                        value={audioHours}
+                        onChange={(e) => setAudioHours(e.target.value)}
+                      />
+                      <Field
+                        id="book-audio-minutes"
+                        label="Durée audio (minutes)"
+                        type="number"
+                        min="0"
+                        max="59"
+                        step="1"
+                        value={audioMinutes}
+                        onChange={(e) => setAudioMinutes(e.target.value)}
+                      />
+                    </div>
+                  )}
+                </>
+              )}
               <details className="form-details" open={modal.type === "edit"}>
                 <summary>Pages, année et apparence</summary>
                 <div className="form-grid">
