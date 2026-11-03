@@ -34,7 +34,7 @@ export function filterBooks(
         status === "all" ||
         (status === "read" && b.is_read) ||
         (status === "gift" && b.is_gift) ||
-        (status === "audio" && b.audio_duration_minutes > 0) ||
+        (status === "audio" && b.audio_duration_minutes != null) ||
         (status === "rated" && b.rating > 0) ||
         (status === "unread" && !b.is_read) ||
         (status === "current" && currentIds.has(b.id)) ||

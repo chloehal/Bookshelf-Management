@@ -56,7 +56,7 @@ export function FormModal({ modal, onClose, data, mutate }) {
     color: book?.color || "",
     is_gift: book?.is_gift || false,
   });
-  const [hasAudio, setHasAudio] = useState(Boolean(book?.audio_duration_minutes));
+  const [hasAudio, setHasAudio] = useState(book?.audio_duration_minutes != null);
   const [audioHours, setAudioHours] = useState(Math.floor((book?.audio_duration_minutes ?? 0) / 60));
   const [audioMinutes, setAudioMinutes] = useState((book?.audio_duration_minutes ?? 0) % 60);
   const canEditAudio = !book?.is_read && !(book?.is_wishlist || modal.wishlist);
@@ -89,8 +89,8 @@ export function FormModal({ modal, onClose, data, mutate }) {
         const payload = bookPayload(form);
         if (canEditAudio) {
           const duration = Number(audioHours) * 60 + Number(audioMinutes);
-          if (hasAudio && (!Number.isInteger(duration) || duration < 1 || duration > 4294967295)) {
-            throw new Error("Indique une durée audio d’au moins une minute.");
+          if (hasAudio && (!Number.isInteger(duration) || duration < 0 || duration > 4294967295)) {
+            throw new Error("Indique une durée audio valide.");
           }
           payload.audio_duration_minutes = hasAudio ? duration : null;
         }
