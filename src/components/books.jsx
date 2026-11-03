@@ -12,7 +12,7 @@ import { Card, CardContent } from "./ui/card";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
 import { Progress } from "./ui/progress";
-import { coverColor, coverForeground, percent } from "../lib/library";
+import { coverColor, coverForeground, formatAudioDuration, percent } from "../lib/library";
 
 export function BookCover({ book, large = false }) {
   book = {
@@ -111,6 +111,11 @@ export function BookCard({ book, onOpen, current, loan }) {
           </div>
           <h3>{book.title}</h3>
           <p>{book.author}</p>
+          {book.audio_duration_minutes > 0 && (
+            <span className="small-label">
+              Audio · {formatAudioDuration(book.audio_duration_minutes)}
+            </span>
+          )}
           {loan ? (
             <span className="small-label">Prêté à {loan.person}</span>
           ) : book.rating ? (
