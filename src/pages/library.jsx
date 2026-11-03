@@ -36,6 +36,8 @@ export function LibraryPage({
   setFilters,
   wishlist = false,
   navigate,
+  mutate,
+  busy,
 }) {
   const [expanded, setExpanded] = useState(false);
   const source = data.books.filter((b) => Boolean(b.is_wishlist) === wishlist),
@@ -204,9 +206,7 @@ export function LibraryPage({
         <span>
           {books.length} livre{books.length !== 1 ? "s" : ""}
         </span>
-        <span>
-          {shelfView ? "Sur les étagères" : "Entre les pages"}
-        </span>
+        <span>{shelfView ? "Sur les étagères" : "Entre les pages"}</span>
       </div>
       {!books.length ? (
         <Empty
@@ -235,6 +235,20 @@ export function LibraryPage({
               key={b.id}
               book={b}
               onOpen={openBook}
+              busy={busy}
+              onSaveAudio={
+                !wishlist && !b.is_read
+                  ? (duration) =>
+                      mutate(
+                        () =>
+                          api.saveBook(
+                            { audio_duration_minutes: duration },
+                            b.id,
+                          ),
+                        "Durée audio enregistrée.",
+                      )
+                  : undefined
+              }
               current={data.current.some((c) => c.book_id === b.id)}
               loan={data.loans.find(
                 (l) => l.book_id === b.id && !l.returned_date,
@@ -324,9 +338,7 @@ export function BookPage({ id, data, openModal, run, busy, navigate }) {
             {book.audio_duration_minutes > 0 && (
               <div>
                 <dt>Livre audio</dt>
-                <dd>
-                  {formatAudioDuration(book.audio_duration_minutes)}
-                </dd>
+                <dd>{formatAudioDuration(book.audio_duration_minutes)}</dd>
               </div>
             )}
             <div>
