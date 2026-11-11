@@ -6,6 +6,10 @@ if ($_SERVER['REQUEST_METHOD'] !== 'GET') { http_response_code(405); echo json_e
 try {
     if (isset($_GET['source'])) {
         echo json_encode(catalog_search_source($_GET));
+    } elseif (isset($_GET['goodreads'])) {
+        $id = $_GET['goodreads'];
+        catalog_source_url('goodreads', $id);
+        echo json_encode(['items'=>[catalog_goodreads_book_parse(catalog_goodreads_fetch('/book/show/'.$id),$id)]]);
     } elseif (isset($_GET['editions'])) {
         echo json_encode(catalog_editions($_GET));
     } elseif (isset($_GET['sudoc'])) {

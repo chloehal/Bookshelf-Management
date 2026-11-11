@@ -337,3 +337,23 @@ L’ISBN `9791041426027` est trouvé au Sudoc (notice 292390726, français, 177 
 conservé dans le parcours manuel. Ces cas ne constituent pas une mesure exhaustive
 de couverture. Les tests navigateur utilisent une bibliothèque isolée et ne
 modifient jamais les données de production.
+
+### Goodreads (accès direct gratuit)
+
+La recherche bibliographique consulte aussi Goodreads, sans compte, token ni
+service Apify. L’ISBN est confirmé sur la fiche de l’édition avant d’être proposé
+comme correspondance exacte. Une recherche par titre affiche des propositions ;
+« Voir les autres éditions » charge les éditions Goodreads, avec leur langue,
+leur format, leur ISBN et leur couverture. La fiche complète est relue avant la
+comparaison et seules les informations choisies sont enregistrées.
+
+Les requêtes utilisent uniquement les pages publiques `/book/auto_complete`,
+`/book/show` et `/work/editions`. Les réponses sont mises en cache pendant 24 h
+dans le répertoire temporaire PHP, avec espacement des requêtes et une nouvelle
+tentative sur erreur 503. Les indisponibilités sont affichées par catalogue et
+n’empêchent pas les autres sources de répondre. Goodreads peut changer ses pages
+ou limiter l’accès : aucune exhaustivité n’est garantie. Pas de migration SQL ni
+de clé supplémentaire ; le serveur doit autoriser les requêtes HTTPS sortantes
+et l’écriture dans son répertoire temporaire.
+
+Validation en lecture seule : `php tests/goodreads-live.php`.

@@ -18,6 +18,7 @@ function catalog_isbn($value) {
     return $isbn;
 }
 function catalog_source_url($source, $id) {
+    if ($source === 'goodreads' && preg_match('/^[1-9]\d{0,15}$/D', $id)) return 'https://www.goodreads.com/book/show/' . $id;
     if ($source === 'openlibrary' && preg_match('/^OL\d+M$/', $id)) return 'https://openlibrary.org/books/' . $id;
     if ($source === 'sudoc' && preg_match('/^\d{8}[\dX]$/', $id)) return 'https://www.sudoc.fr/' . $id;
     if ($source === 'bnf' && preg_match('/^cb\d{8}[0-9a-z]$/', $id)) return 'https://catalogue.bnf.fr/ark:/12148/' . $id;
@@ -26,6 +27,7 @@ function catalog_source_url($source, $id) {
 function catalog_cover_url($value) {
     if (!$value) return null;
     $value = preg_replace('~^http://~', 'https://', (string) $value);
+    if (preg_match('~^https://(?:m\.media-amazon\.com|i\.gr-assets\.com|images\.gr-assets\.com)/images/S/compressed\.photo\.goodreads\.com/books/\d+[il]/\d+(?:\._S[XY]\d+_)?\.jpg$~D', $value)) return $value;
     $parts = parse_url($value);
     if (($parts['scheme'] ?? '') === 'https' && ($parts['host'] ?? '') === 'openapi.bnf.fr' && ($parts['path'] ?? '') === '/couverture/image/image/recupererImage' && !isset($parts['user']) && !isset($parts['pass']) && !isset($parts['fragment']) && !isset($parts['port'])) {
         parse_str($parts['query'] ?? '', $params);

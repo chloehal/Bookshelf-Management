@@ -74,6 +74,11 @@ export function convertProgress(page, oldTotal, newTotal) {
 }
 
 export function catalogSourceInfo(source = "openlibrary", id = "") {
+  if (source === "goodreads" && /^[1-9]\d{0,15}$/.test(id))
+    return {
+      label: "Goodreads",
+      url: `https://www.goodreads.com/book/show/${id}`,
+    };
   if (source === "sudoc" && /^\d{8}[\dX]$/.test(id))
     return { label: "Sudoc", url: `https://www.sudoc.fr/${id}` };
   if (source === "bnf" && /^cb\d{8}[0-9a-z]$/.test(id))
