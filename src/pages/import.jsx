@@ -5,6 +5,11 @@ import { BookCover, Empty, PageHeading } from "../components/books";
 import { Field } from "../components/forms";
 import { api } from "../lib/api";
 import {
+  parsePersonalGoodreads,
+  searchPersonalGoodreads,
+  PERSONAL_GOODREADS_KEY,
+} from "../../personal-goodreads.mjs";
+import {
   CATALOG_FIELDS,
   normalizeIsbn,
   comparisonRows,
@@ -48,6 +53,15 @@ export function ImportPage({ data, route, navigate, mutate, busy, reload }) {
   const [language, setLanguage] = useState("all");
   const [confirmedIdentity, setConfirmedIdentity] = useState(false);
   const [searchContext, setSearchContext] = useState(null);
+  const [personalEditions, setPersonalEditions] = useState(() => {
+    try {
+      return parsePersonalGoodreads(
+        localStorage.getItem(PERSONAL_GOODREADS_KEY),
+      );
+    } catch {
+      return [];
+    }
+  });
   const generation = useRef(0);
   const [savedDraft, setSavedDraft] = useState(() => {
     try {
@@ -100,6 +114,36 @@ export function ImportPage({ data, route, navigate, mutate, busy, reload }) {
     [],
   );
   const disabled = pending || busy;
+  async function loadPersonalEditions(event) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setError("");
+    try {
+      if (file.size > 5_000_000)
+        throw new Error("Fichier Goodreads trop volumineux.");
+      const editions = parsePersonalGoodreads(await file.text());
+      let persisted = true;
+      try {
+        localStorage.setItem(
+          PERSONAL_GOODREADS_KEY,
+          JSON.stringify({ format: "bookshelf.goodreads.v1", books: editions }),
+        );
+      } catch {
+        persisted = false;
+      }
+      setPersonalEditions(editions);
+      setItems([]);
+      setNext(null);
+      setSourceStates({});
+      setMessage(
+        `${editions.length} éditions Goodreads chargées. ${persisted ? "Elles sont conservées dans ce navigateur." : "Elles restent disponibles pour cette session."}`,
+      );
+    } catch (error) {
+      setError(error.message);
+    } finally {
+      event.target.value = "";
+    }
+  }
   async function lookup(params, book = target, append = false) {
     if (lock.current || busy) return;
     const requestId = ++generation.current;
@@ -113,6 +157,38 @@ export function ImportPage({ data, route, navigate, mutate, busy, reload }) {
       setItems([]);
       setNext(null);
       setSearchContext(params);
+    }
+    if (
+      !append &&
+      !params.public_catalogues &&
+      !params.editions &&
+      !params.work &&
+      !params.source &&
+      personalEditions.length
+    ) {
+      let personal = searchPersonalGoodreads(personalEditions, params, book);
+      let differentIsbn = false;
+      if (!personal.length && params.isbn && book) {
+        personal = searchPersonalGoodreads(personalEditions, {
+          title: book.title,
+          author: book.author,
+        });
+        differentIsbn = personal.length > 0;
+      }
+      setItems(personal);
+      setSourceStates({
+        personal: `${personal.length} édition(s) de ton compte`,
+      });
+      setMessage(
+        !personal.length
+          ? "Aucune édition de ton compte ne correspond à cette recherche. Essaie le titre sans auteur, ou choisis de chercher dans les catalogues publics."
+          : differentIsbn
+            ? "L’ISBN local ne correspond pas à ton édition Goodreads. Voici les éditions de ton compte pour ce titre et cet auteur : compare avant d’appliquer tes choix."
+            : "Éditions présentes dans ta bibliothèque Goodreads. Vérifie la couverture, l’ISBN et le format avant d’appliquer tes choix.",
+      );
+      lock.current = false;
+      setPending(false);
+      return;
     }
     setMessage(
       "Recherche dans les catalogues… Les résultats apparaissent au fur et à mesure.",
@@ -306,7 +382,20 @@ export function ImportPage({ data, route, navigate, mutate, busy, reload }) {
     setAuthor(book?.author || "");
     setError("");
     setMessage("");
-    if (book?.metadata_source_id)
+    const personal = book
+      ? searchPersonalGoodreads(
+          personalEditions,
+          { title: book.title, author: book.author },
+          book,
+        )
+      : [];
+    const linkedPersonal = personal.find(
+      (edition) =>
+        book?.metadata_source === "goodreads" &&
+        edition.source_id === String(book.metadata_source_id),
+    );
+    if (linkedPersonal) select(linkedPersonal, book);
+    else if (book?.metadata_source_id)
       select(
         {
           source_id: book.metadata_source_id,
@@ -728,6 +817,48 @@ export function ImportPage({ data, route, navigate, mutate, busy, reload }) {
         className="paper-card import-form"
         aria-label="Recherche bibliographique"
       >
+        <div className="border-b pb-4 mb-4">
+          <label className="grid gap-2" htmlFor="personal-goodreads-file">
+            <strong>Mes éditions Goodreads</strong>
+            <span>
+              Charge le fichier de tes éditions (.json) pour comparer les livres
+              de ton compte, avec leurs couvertures.
+            </span>
+            <input
+              id="personal-goodreads-file"
+              type="file"
+              accept=".json,application/json"
+              disabled={disabled}
+              onChange={loadPersonalEditions}
+            />
+          </label>
+          {personalEditions.length > 0 && (
+            <div className="mt-3 flex flex-wrap items-center gap-3">
+              <p>
+                {personalEditions.length} éditions chargées · priorité à ta
+                bibliothèque Goodreads.
+              </p>
+              <Button
+                variant="ghost"
+                disabled={disabled}
+                onClick={() => {
+                  setPersonalEditions([]);
+                  try {
+                    localStorage.removeItem(PERSONAL_GOODREADS_KEY);
+                  } catch {}
+                  setItems([]);
+                  setNext(null);
+                  setSourceStates({});
+                  setMessage(
+                    "Les éditions Goodreads ont été retirées de ce navigateur.",
+                  );
+                }}
+              >
+                Retirer le fichier
+              </Button>
+            </div>
+          )}
+        </div>
         <h2>
           {target ? `Rechercher pour « ${target.title} »` : "Ajouter par ISBN"}
         </h2>
@@ -783,10 +914,22 @@ export function ImportPage({ data, route, navigate, mutate, busy, reload }) {
         <ul aria-label="État des catalogues" aria-live="polite">
           {Object.entries(sourceStates).map(([source, state]) => (
             <li key={source}>
-              {SOURCES[source]} : {state}
+              {source === "personal"
+                ? "Ma bibliothèque Goodreads"
+                : SOURCES[source]}{" "}
+              : {state}
             </li>
           ))}
         </ul>
+        {personalEditions.length > 0 && searchContext && (
+          <Button
+            variant="outline"
+            disabled={disabled}
+            onClick={() => lookup({ ...searchContext, public_catalogues: 1 })}
+          >
+            Chercher aussi dans les catalogues publics
+          </Button>
+        )}
         <p>
           ISBN exact d’abord, puis éditions françaises, langues inconnues et
           autres langues.
