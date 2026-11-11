@@ -19,7 +19,12 @@ import {
   editionLanguageLabel,
 } from "../../catalog.mjs";
 
-const SOURCES = { openlibrary: "Open Library", bnf: "BnF", sudoc: "Sudoc" };
+const SOURCES = {
+  openlibrary: "Open Library",
+  bnf: "BnF",
+  sudoc: "Sudoc",
+  goodreads: "Goodreads",
+};
 const DRAFT_KEY = "bookshelf-import-draft-v1";
 const text = (value) =>
   Array.isArray(value) ? value.join(", ") : (value ?? "Non renseigné");
@@ -110,7 +115,7 @@ export function ImportPage({ data, route, navigate, mutate, busy, reload }) {
       setSearchContext(params);
     }
     setMessage(
-      "Recherche dans les trois catalogues… Les résultats apparaissent au fur et à mesure.",
+      "Recherche dans les catalogues… Les résultats apparaissent au fur et à mesure.",
     );
     // Edition expansion retains its independent legacy cursors.
     if (params.editions || params.work) {
@@ -142,7 +147,9 @@ export function ImportPage({ data, route, navigate, mutate, busy, reload }) {
     const requests =
       append && params.requests
         ? params.requests
-        : Object.keys(SOURCES).map((source) => ({ ...params, source }));
+        : params.source
+          ? [params]
+          : Object.keys(SOURCES).map((source) => ({ ...params, source }));
     const requestedSources = requests.map((q) => q.source);
     setSourceStates((current) => ({
       ...(!append ? {} : current),
@@ -216,8 +223,9 @@ export function ImportPage({ data, route, navigate, mutate, busy, reload }) {
         : (
             await api.request(
               "catalog.php?" +
-                ({ bnf: "bnf=", sudoc: "sudoc=" }[item.lookup_source] ||
-                  "olid=") +
+                ({ bnf: "bnf=", sudoc: "sudoc=", goodreads: "goodreads=" }[
+                  item.lookup_source
+                ] || "olid=") +
                 encodeURIComponent(item.source_id),
             )
           ).items[0];
@@ -899,7 +907,8 @@ export function ImportPage({ data, route, navigate, mutate, busy, reload }) {
                     ...item,
                     cover_url:
                       item.cover_url ||
-                      ((item.source || "openlibrary") === "openlibrary"
+                      ((item.source || item.lookup_source || "openlibrary") ===
+                      "openlibrary"
                         ? `https://covers.openlibrary.org/b/olid/${item.source_id}-M.jpg?default=false`
                         : null),
                   }}
@@ -937,22 +946,36 @@ export function ImportPage({ data, route, navigate, mutate, busy, reload }) {
                         ? "Comparer cette édition"
                         : "Vérifier avant ajout"}
                     </Button>
-                    {item.title && (!item.edition_result || item.work_id) && (
-                      <Button
-                        variant="outline"
-                        disabled={disabled}
-                        onClick={() =>
-                          lookup({
-                            editions: 1,
-                            title: item.title,
-                            author: item.author || "",
-                            ...(item.work_id ? { work: item.work_id } : {}),
-                          })
-                        }
-                      >
-                        Voir les autres éditions
-                      </Button>
-                    )}
+                    {item.title &&
+                      (!item.edition_result ||
+                        item.work_id ||
+                        item.goodreads_work) && (
+                        <Button
+                          variant="outline"
+                          disabled={disabled}
+                          onClick={() =>
+                            lookup(
+                              item.goodreads_work
+                                ? {
+                                    source: "goodreads",
+                                    goodreads_work: item.goodreads_work,
+                                    title: item.title,
+                                    author: item.author || "",
+                                  }
+                                : {
+                                    editions: 1,
+                                    title: item.title,
+                                    author: item.author || "",
+                                    ...(item.work_id
+                                      ? { work: item.work_id }
+                                      : {}),
+                                  },
+                            )
+                          }
+                        >
+                          Voir les autres éditions
+                        </Button>
+                      )}
                   </div>
                 </div>
               </article>

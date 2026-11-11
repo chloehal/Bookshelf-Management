@@ -15,6 +15,97 @@ const candidate = {
 };
 test.setTimeout(60000);
 
+test("Goodreads charge les éditions, compare la couverture et conserve les choix locaux", async ({
+  page,
+}) => {
+  const state = await setup(page);
+  const local = state.data.books.find((book) => !book.is_wishlist);
+  Object.assign(local, {
+    title: "Perspective(s)",
+    author: "Laurent Binet",
+    isbn: "9782253907701",
+    cover_url: null,
+  });
+  await page.reload();
+  const proposal = {
+    source: "goodreads",
+    source_id: "220174931",
+    title: "Perspective(s)",
+    author: "Laurent Binet",
+    isbn: "9782253907701",
+    genres: ["Fiction"],
+    page_count: 336,
+    publisher: "Le Livre de Poche",
+    published_date: "2025-01-02",
+    languages: ["fr"],
+    format: "Mass Market Paperback",
+    cover_url:
+      "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1736683438i/220174931.jpg",
+    goodreads_work: "151621149",
+  };
+  await page.route("https://m.media-amazon.com/**", (route) =>
+    route.fulfill({ status: 404, body: "" }),
+  );
+  const requests = [];
+  await page.route("**/api/catalog.php?**", async (route) => {
+    const params = new URL(route.request().url()).searchParams;
+    requests.push(Object.fromEntries(params));
+    if (params.has("goodreads"))
+      return route.fulfill({ json: { items: [proposal] } });
+    if (params.get("source") !== "goodreads")
+      return route.fulfill({ json: { items: [], next: null } });
+    return route.fulfill({
+      json: {
+        items: [
+          {
+            ...proposal,
+            source: undefined,
+            lookup_source: "goodreads",
+            edition_result: params.has("goodreads_work"),
+          },
+        ],
+        next: null,
+      },
+    });
+  });
+  await page
+    .locator(".import-result")
+    .filter({ hasText: "Perspective(s)" })
+    .getByRole("button", { name: "Rechercher une correspondance" })
+    .click();
+  await page.getByRole("button", { name: "Rechercher titre / auteur" }).click();
+  await expect(page.getByLabel("État des catalogues")).toContainText(
+    "Goodreads : 1 notice(s)",
+  );
+  await page.getByRole("button", { name: "Voir les autres éditions" }).click();
+  await expect
+    .poll(() =>
+      requests.some(
+        (q) => q.source === "goodreads" && q.goodreads_work === "151621149",
+      ),
+    )
+    .toBe(true);
+  await page.getByRole("button", { name: "Comparer cette édition" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Réconcilier « Perspective(s) »" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("link", {
+      name: "Voir l’édition dans Goodreads",
+      exact: true,
+    }),
+  ).toHaveAttribute("href", "https://www.goodreads.com/book/show/220174931");
+  await page.locator('input[name="reconcile-cover_url"]').nth(1).check();
+  await page
+    .getByRole("button", { name: "Enregistrer mes choix et lier la fiche" })
+    .click();
+  await expect.poll(() => state.writes.length).toBe(1);
+  expect(state.writes[0].candidate.source).toBe("goodreads");
+  expect(state.writes[0].choices.cover_url).toBe("api");
+  expect(state.writes[0].choices.title).toBe("local");
+  expect(local.cover_url).toBe(proposal.cover_url);
+});
+
 test("une sélection lente ne remplace pas la dernière édition choisie", async ({
   page,
 }) => {
@@ -143,7 +234,7 @@ test("un ISBN introuvable peut être saisi manuellement puis repris après recha
   expect(state.writes[0].values.isbn).toBe("9782707358158");
 });
 
-test("un nouveau livre recherche les trois catalogues et affiche le français en priorité", async ({
+test("un nouveau livre recherche les quatre catalogues et affiche le français en priorité", async ({
   page,
 }) => {
   await setup(page);
@@ -172,6 +263,13 @@ test("un nouveau livre recherche les trois catalogues et affiche le français en
         title: "Notice sans langue",
         languages: [],
       },
+      goodreads: {
+        ...candidate,
+        source: "goodreads",
+        source_id: "220174931",
+        title: "Autre notice française",
+        languages: ["fr"],
+      },
     };
     return route.fulfill({
       json: { items: [{ ...records[source], isbn: null }], next: null, source },
@@ -182,7 +280,7 @@ test("un nouveau livre recherche les trois catalogues et affiche le français en
   const results = page.getByRole("region", {
     name: "Recherche bibliographique",
   });
-  await expect(results.locator(".import-result")).toHaveCount(3);
+  await expect(results.locator(".import-result")).toHaveCount(4);
   await expect(results.locator(".import-result").first()).toContainText(
     "Édition française",
   );
