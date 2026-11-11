@@ -357,3 +357,20 @@ de clé supplémentaire ; le serveur doit autoriser les requêtes HTTPS sortante
 et l’écriture dans son répertoire temporaire.
 
 Validation en lecture seule : `php tests/goodreads-live.php`.
+
+### Éditions de mon compte Goodreads
+
+Dans l’écran d’import, « Mes éditions Goodreads » charge un fichier JSON au
+format `bookshelf.goodreads.v1`, préparé à partir de l’export du compte et des
+couvertures affichées dans sa bibliothèque. Les livres sont enregistrés dans le
+stockage local du navigateur. Le fichier complet, les avis et les notes privées
+ne sont jamais envoyés au serveur ; seules les métadonnées de l’édition choisie
+sont transmises lors de l’enregistrement habituel.
+
+Les recherches privilégient ces éditions personnelles. Si l’ISBN local ne
+correspond pas, une fiche existante peut recevoir des propositions par titre et
+auteur, avec un avertissement ; aucun changement n’est appliqué automatiquement.
+Les correspondances incertaines peuvent être recherchées sans auteur ou dans les
+catalogues publics. « Retirer le fichier » efface le catalogue personnel du
+navigateur sans modifier les livres déjà enregistrés. Aucune migration ni clé API
+n’est nécessaire. Les fichiers personnels ne doivent pas être ajoutés au dépôt.

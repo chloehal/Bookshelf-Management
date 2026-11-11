@@ -15,6 +15,91 @@ const candidate = {
 };
 test.setTimeout(60000);
 
+test("les éditions personnelles Goodreads évitent les recherches publiques et corrigent un ISBN local différent", async ({
+  page,
+}) => {
+  const state = await setup(page);
+  const local = state.data.books.find((book) => !book.is_wishlist);
+  Object.assign(local, {
+    title: "Perspective(s)",
+    author: "Laurent Binet",
+    isbn: "9782246829355",
+    cover_url: null,
+  });
+  await page.reload();
+  let publicCalls = 0;
+  await page.route("**/api/catalog.php?**", (route) => {
+    publicCalls++;
+    return route.fulfill({ json: { items: [], next: null } });
+  });
+  const personal = {
+    format: "bookshelf.goodreads.v1",
+    books: [
+      {
+        source: "goodreads",
+        source_id: "220174931",
+        title: "Perspective(s)",
+        author: "Laurent Binet",
+        isbn: "9782253907701",
+        page_count: 336,
+        publisher: "Le Livre de Poche",
+        cover_url:
+          "https://i.gr-assets.com/images/S/compressed.photo.goodreads.com/books/1736683438l/220174931.jpg",
+      },
+    ],
+  };
+  await page.locator("#personal-goodreads-file").setInputFiles({
+    name: "mes-editions.json",
+    mimeType: "application/json",
+    buffer: Buffer.from(JSON.stringify(personal)),
+  });
+  await expect(
+    page.getByText(
+      "1 éditions chargées · priorité à ta bibliothèque Goodreads.",
+    ),
+  ).toBeVisible();
+  await page.reload();
+  await expect(
+    page.getByText(
+      "1 éditions chargées · priorité à ta bibliothèque Goodreads.",
+    ),
+  ).toBeVisible();
+  await page
+    .getByLabel("Titre", { exact: true })
+    .fill("Un livre absent de mon compte");
+  await page.getByRole("button", { name: "Rechercher titre / auteur" }).click();
+  await expect(page.getByRole("status")).toContainText(
+    "Aucune édition de ton compte",
+  );
+  expect(publicCalls).toBe(0);
+  await page
+    .locator(".import-result")
+    .filter({ hasText: "Perspective(s)" })
+    .getByRole("button", { name: "Rechercher une correspondance" })
+    .click();
+  await page
+    .getByRole("button", { name: "Rechercher par ISBN", exact: true })
+    .click();
+  await expect(page.getByLabel("État des catalogues")).toContainText(
+    "Ma bibliothèque Goodreads : 1 édition(s)",
+  );
+  await expect(page.getByRole("status")).toContainText("ISBN local");
+  await page.getByRole("button", { name: "Comparer cette édition" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Réconcilier « Perspective(s) »" }),
+  ).toBeVisible();
+  await page.locator('input[name="reconcile-isbn"]').nth(1).check();
+  await page.locator('input[name="reconcile-cover_url"]').nth(1).check();
+  await page
+    .getByRole("button", { name: "Enregistrer mes choix et lier la fiche" })
+    .click();
+  await expect.poll(() => state.writes.length).toBe(1);
+  expect(publicCalls).toBe(0);
+  expect(local.isbn).toBe("9782253907701");
+  expect(local.cover_url).toBe(personal.books[0].cover_url);
+  expect(state.writes[0].choices.title).toBe("local");
+});
+
 test("Goodreads charge les éditions, compare la couverture et conserve les choix locaux", async ({
   page,
 }) => {
